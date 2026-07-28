@@ -13,6 +13,7 @@ export async function addAhspItem(formData: FormData) {
   const name = String(formData.get('name') ?? '').trim()
   const unit = String(formData.get('unit') ?? '').trim()
   const unit_price = Number(formData.get('unit_price') ?? 0)
+  const tkdn_percent = Number(formData.get('tkdn_percent') ?? 0)
   const code = String(formData.get('code') ?? '').trim() || null
   const category_id = String(formData.get('category_id') ?? '') || null
 
@@ -23,6 +24,7 @@ export async function addAhspItem(formData: FormData) {
     name,
     unit,
     unit_price,
+    tkdn_percent,
     code,
     category_id,
   })

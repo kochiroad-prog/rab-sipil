@@ -51,10 +51,43 @@ git push -u origin main
 3. Deploy — cek build log kalau ada error env yang belum ke-set.
 4. Tambahkan domain production ke `NEXT_PUBLIC_APP_URL` lalu redeploy.
 
-## Fase 6 — Iterasi lanjut (opsional, belum dikerjakan)
+## Fase 6 — Fitur lanjutan (referensi BikinRAB.id) — selesai
 
-- Export RAB ke PDF/Excel.
-- Edit inline (bukan cuma tambah/hapus) untuk item RAB.
+Migration `0002_tkdn_volume_categories.sql` dan `0003_project_overhead.sql` sudah diterapkan ke Supabase.
+Lolos `tsc --noEmit`, `next build`, `eslint`, dan export Excel sudah diuji dengan data dummy
+(formula di-recalculate pakai LibreOffice headless, hasil sudah dicek benar).
+
+- **Export RAB ke Excel** (`/api/projects/[id]/export`, logic di `src/lib/export-excel.ts`):
+  4 sheet formula-linked — Informasi, Rincian RAB (BoQ per kategori + SUBTOTAL), Rekapitulasi
+  (referensi ke Rincian RAB, PPN, pembulatan), Rekapitulasi TKDN. Struktur & nama sheet mengikuti
+  contoh `sample.xls` dari BikinRAB.id yang dibagikan user.
+- **TKDN**: field `tkdn_percent` di `ahsp_items`, `rab_items`, `ahsp_components`. Nilai TKDN proyek
+  dihitung rata-rata tertimbang (bukan metodologi resmi Nilai Gabungan Barang & Jasa Permen PUPR —
+  itu butuh breakdown material/upah/alat lengkap per AHSP yang belum ada datanya).
+- **Backup Volume** (`/projects/[id]/volume`): generator volume beton/bekisting/besi dari dimensi
+  kolom/balok/sloof/plat (`src/lib/volume-calc.ts`), bisa dikirim langsung jadi baris RAB.
+- **Kategori AHSP resmi**: Bina Marga/Cipta Karya/Sumber Daya Air/Umum ditambahkan ke `ahsp_categories`
+  + filter di halaman Database AHSP.
+- **Pengaturan proyek**: PPN%, Overhead & Profit%, Tahun Anggaran per proyek (dipakai di sheet Informasi).
+- **Edit harga & TKDN inline** langsung di tabel Rincian RAB (klik nilai harga).
+
+### Keterbatasan yang perlu diketahui
+
+- **Database AHSP 5.8K+ item resmi tidak diisi otomatis** — itu data berlisensi/proprietary milik
+  BikinRAB.id, tidak bisa saya fabrikasi. Tabel `ahsp_items`/`ahsp_components` sudah siap menampung,
+  tapi pengisian harga & koefisien tetap manual/import oleh user.
+- **AHSP/HSD sheet (breakdown bahan-upah-alat per pekerjaan) belum digenerate** di Excel export karena
+  `ahsp_components` di database masih kosong (belum ada UI untuk isi komposisi per item AHSP). Kalau
+  mau dibangun: perlu (1) UI input komposisi bahan/upah/alat per `ahsp_item`, lalu (2) sheet AHSP +
+  HSD Upah/Bahan/Alat di export mengikuti pola formula `='HSD Bahan'!E4` seperti contoh asli.
+- **TKDN yang ditampilkan adalah estimasi sederhana**, bukan perhitungan resmi tender (yang butuh
+  pemisahan Barang/Jasa Dalam Negeri vs Luar Negeri per komponen).
+
+## Fase 7 — Iterasi lanjut (opsional, belum dikerjakan)
+
+- UI komposisi AHSP (bahan/upah/alat per item) + sheet AHSP/HSD di export Excel.
+- Perhitungan TKDN resmi (Nilai Gabungan Barang & Jasa sesuai Permen PUPR).
+- Export ke PDF.
 - Login Google (OAuth) di samping email/password.
-- Rincian komponen AHSP (bahan/upah/alat) — tabel `ahsp_components` sudah ada di skema, UI belum dibuat.
 - Riwayat perubahan / versi RAB per proyek.
+- Drag-and-drop reorder kategori/item RAB (saat ini urutan ikuti waktu input).

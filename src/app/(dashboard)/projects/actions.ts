@@ -32,6 +32,23 @@ export async function createProject(formData: FormData) {
   redirect(`/projects/${data.id}`)
 }
 
+export async function updateProjectSettings(formData: FormData) {
+  const supabase = await createClient()
+  const id = String(formData.get('id') ?? '')
+  const ppn_percent = Number(formData.get('ppn_percent') ?? 11)
+  const overhead_percent = Number(formData.get('overhead_percent') ?? 10)
+  const tahun_anggaran = formData.get('tahun_anggaran')
+    ? Number(formData.get('tahun_anggaran'))
+    : null
+
+  await supabase
+    .from('projects')
+    .update({ ppn_percent, overhead_percent, tahun_anggaran })
+    .eq('id', id)
+
+  revalidatePath(`/projects/${id}`)
+}
+
 export async function deleteProject(formData: FormData) {
   const supabase = await createClient()
   const id = String(formData.get('id') ?? '')
@@ -49,8 +66,18 @@ export async function addRabItem(formData: FormData) {
   const unit_price = Number(formData.get('unit_price') ?? 0)
   const section = String(formData.get('section') ?? '').trim() || null
   const ahsp_item_id = String(formData.get('ahsp_item_id') ?? '') || null
+  let tkdn_percent = Number(formData.get('tkdn_percent') ?? 0)
 
   if (!name || !unit || !project_id) return
+
+  if (!tkdn_percent && ahsp_item_id) {
+    const { data: ahsp } = await supabase
+      .from('ahsp_items')
+      .select('tkdn_percent')
+      .eq('id', ahsp_item_id)
+      .single()
+    tkdn_percent = ahsp?.tkdn_percent ?? 0
+  }
 
   await supabase.from('rab_items').insert({
     project_id,
@@ -60,8 +87,20 @@ export async function addRabItem(formData: FormData) {
     unit_price,
     section,
     ahsp_item_id,
+    tkdn_percent,
   })
 
+  revalidatePath(`/projects/${project_id}`)
+}
+
+export async function updateRabItem(formData: FormData) {
+  const supabase = await createClient()
+  const id = String(formData.get('id') ?? '')
+  const project_id = String(formData.get('project_id') ?? '')
+  const unit_price = Number(formData.get('unit_price') ?? 0)
+  const tkdn_percent = Number(formData.get('tkdn_percent') ?? 0)
+
+  await supabase.from('rab_items').update({ unit_price, tkdn_percent }).eq('id', id)
   revalidatePath(`/projects/${project_id}`)
 }
 
