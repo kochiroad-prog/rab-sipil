@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs'
-import type { Project, RabItem } from '@/types/database'
+import type { Project, RabItem, AhspItem, AhspComponent } from '@/types/database'
 
 const HEADER_FONT = { bold: true }
 const TITLE_FONT = { bold: true, size: 14 }
@@ -9,7 +9,12 @@ function f(formula: string) {
   return { formula }
 }
 
-export function buildRabWorkbook(project: Project, rabItems: RabItem[]) {
+export type AhspDetail = { item: AhspItem; components: AhspComponent[] }
+
+const COMPONENT_LABEL: Record<string, string> = { labor: 'TENAGA', material: 'BAHAN', equipment: 'PERALATAN' }
+const HSD_SHEET_BY_TYPE: Record<string, string> = { labor: 'HSD Upah', material: 'HSD Bahan', equipment: 'HSD Alat' }
+
+export function buildRabWorkbook(project: Project, rabItems: RabItem[], ahspDetails: AhspDetail[] = []) {
   // ---------- kelompokkan per section, urutan sesuai kemunculan pertama ----------
   const sections: { name: string; items: RabItem[] }[] = []
   const sectionIndex = new Map<string, number>()
@@ -48,24 +53,187 @@ export function buildRabWorkbook(project: Project, rabItems: RabItem[]) {
   wsInfo.getCell('A8').font = HEADER_FONT
   wsInfo.getCell('B8').value =
     'Harga satuan pada dokumen ini adalah harga all-in (sudah termasuk profit) sesuai yang diisi pengguna di aplikasi, ' +
-    'kecuali item yang memakai rincian komposisi AHSP (bahan/upah/alat) tersendiri. ' +
+    'kecuali item yang memakai rincian komposisi AHSP (bahan/upah/alat) tersendiri — item tsb otomatis mengambil harga dari sheet AHSP/HSD. ' +
     'Nilai TKDN pada sheet "Rekapitulasi TKDN" adalah estimasi rata-rata tertimbang dari %TKDN per item — ' +
     'bukan perhitungan resmi Nilai Gabungan Barang & Jasa sesuai Permen PUPR. Untuk keperluan tender, verifikasi ulang manual.'
   wsInfo.getCell('B8').alignment = { wrapText: true }
   wsInfo.getRow(8).height = 60
 
+  // ================= SHEET: HSD Upah / HSD Bahan / HSD Alat (kalau ada komposisi) =================
+  // componentRowRef: key `${type}::${name}::${unit}` -> { sheet, row }
+  const componentRowRef = new Map<string, { sheet: string; row: number }>()
+  const hasComponents = ahspDetails.some((d) => d.components.length > 0)
+
+  if (hasComponents) {
+    const byType: Record<string, { name: string; unit: string; price: number; tkdn: number }[]> = {
+      labor: [],
+      material: [],
+      equipment: [],
+    }
+    const seen = new Set<string>()
+    for (const d of ahspDetails) {
+      for (const c of d.components) {
+        const key = `${c.component_type}::${c.name}::${c.unit}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        byType[c.component_type]?.push({ name: c.name, unit: c.unit, price: c.unit_price, tkdn: c.tkdn_percent })
+      }
+    }
+
+    const sheetTitles: Record<string, string> = {
+      labor: 'HARGA SATUAN DASAR UPAH',
+      material: 'HARGA SATUAN DASAR BAHAN',
+      equipment: 'HARGA SATUAN DASAR ALAT',
+    }
+
+    for (const type of ['labor', 'material', 'equipment'] as const) {
+      const sheetName = HSD_SHEET_BY_TYPE[type]
+      const ws = wb.addWorksheet(sheetName)
+      ws.columns = [{ width: 6 }, { width: 40 }, { width: 8 }, { width: 18 }, { width: 10 }]
+      ws.getCell('A1').value = sheetTitles[type]
+      ws.getCell('A1').font = TITLE_FONT
+      ws.getCell('A3').value = 'No'
+      ws.getCell('B3').value = 'Nama Item'
+      ws.getCell('C3').value = 'Sat'
+      ws.getCell('D3').value = 'Harga Dasar (Rp)'
+      ws.getCell('E3').value = '% TKDN'
+      ws.getRow(3).font = HEADER_FONT
+
+      byType[type].forEach((row, i) => {
+        const r = i + 4
+        ws.getCell(`A${r}`).value = i + 1
+        ws.getCell(`B${r}`).value = row.name
+        ws.getCell(`C${r}`).value = row.unit
+        ws.getCell(`D${r}`).value = row.price
+        ws.getCell(`D${r}`).numFmt = CURRENCY_FMT
+        ws.getCell(`E${r}`).value = row.tkdn
+        componentRowRef.set(`${type}::${row.name}::${row.unit}`, { sheet: sheetName, row: r })
+      })
+    }
+  }
+
+  // ================= SHEET: AHSP (kalau ada komposisi) =================
+  const ahspFinalRow = new Map<string, number>() // ahsp_item_id -> row G harga satuan pekerjaan
+  if (hasComponents) {
+    const wsAhsp = wb.addWorksheet('AHSP')
+    wsAhsp.columns = [
+      { width: 6 }, { width: 34 }, { width: 10 }, { width: 8 }, { width: 12 }, { width: 16 }, { width: 18 }, { width: 18 },
+    ]
+    wsAhsp.getCell('A1').value = 'ANALISA HARGA SATUAN PEKERJAAN'
+    wsAhsp.getCell('A1').font = TITLE_FONT
+
+    let ar = 3
+    for (const detail of ahspDetails) {
+      if (detail.components.length === 0) continue
+      const { item, components } = detail
+
+      wsAhsp.getCell(`B${ar}`).value = 'URAIAN PEKERJAAN'
+      wsAhsp.getCell(`C${ar}`).value = `: ${item.name}`
+      ar++
+      wsAhsp.getCell(`B${ar}`).value = 'KODE'
+      wsAhsp.getCell(`C${ar}`).value = `: ${item.code ?? '-'}`
+      ar++
+      wsAhsp.getCell(`B${ar}`).value = 'SATUAN'
+      wsAhsp.getCell(`C${ar}`).value = `: ${item.unit}`
+      ar++
+
+      const headerR = ar
+      ;['No', 'Uraian', 'Satuan', 'Koefisien', 'Harga Satuan (Rp)', 'Jumlah Harga (Rp)', 'Jumlah TKDN (Rp)'].forEach((h, i) => {
+        const cell = wsAhsp.getCell(headerR, i + 1)
+        cell.value = h
+        cell.font = HEADER_FONT
+      })
+      ar++
+
+      const typeSubtotalRows: Record<string, number> = {}
+      const letters = 'ABC'
+      let letterIdx = 0
+
+      for (const type of ['labor', 'material', 'equipment'] as const) {
+        const rows = components.filter((c) => c.component_type === type)
+        if (rows.length === 0) continue
+
+        wsAhsp.getCell(`A${ar}`).value = letters[letterIdx]
+        wsAhsp.getCell(`B${ar}`).value = COMPONENT_LABEL[type]
+        wsAhsp.getCell(`A${ar}`).font = HEADER_FONT
+        wsAhsp.getCell(`B${ar}`).font = HEADER_FONT
+        ar++
+
+        const firstRow = ar
+        for (const c of rows) {
+          const ref = componentRowRef.get(`${type}::${c.name}::${c.unit}`)
+          wsAhsp.getCell(`B${ar}`).value = c.name
+          wsAhsp.getCell(`C${ar}`).value = c.unit
+          wsAhsp.getCell(`D${ar}`).value = c.coefficient
+          if (ref) {
+            wsAhsp.getCell(`E${ar}`).value = f(`'${ref.sheet}'!D${ref.row}`)
+          } else {
+            wsAhsp.getCell(`E${ar}`).value = c.unit_price
+          }
+          wsAhsp.getCell(`E${ar}`).numFmt = CURRENCY_FMT
+          wsAhsp.getCell(`F${ar}`).value = f(`D${ar}*E${ar}`)
+          wsAhsp.getCell(`F${ar}`).numFmt = CURRENCY_FMT
+          if (ref) {
+            wsAhsp.getCell(`G${ar}`).value = f(`F${ar}*('${ref.sheet}'!E${ref.row}/100)`)
+          } else {
+            wsAhsp.getCell(`G${ar}`).value = f(`F${ar}*(${c.tkdn_percent}/100)`)
+          }
+          wsAhsp.getCell(`G${ar}`).numFmt = CURRENCY_FMT
+          ar++
+        }
+        const lastRow = ar - 1
+        wsAhsp.getCell(`B${ar}`).value = `JUMLAH HARGA ${COMPONENT_LABEL[type]}`
+        wsAhsp.getCell(`F${ar}`).value = f(`SUM(F${firstRow}:F${lastRow})`)
+        wsAhsp.getCell(`F${ar}`).numFmt = CURRENCY_FMT
+        wsAhsp.getCell(`G${ar}`).value = f(`SUM(G${firstRow}:G${lastRow})`)
+        wsAhsp.getCell(`G${ar}`).numFmt = CURRENCY_FMT
+        typeSubtotalRows[type] = ar
+        ar++
+        letterIdx++
+      }
+
+      const jumlahRow = ar
+      const parts = ['labor', 'material', 'equipment'].map((t) => typeSubtotalRows[t]).filter(Boolean)
+      wsAhsp.getCell(`A${jumlahRow}`).value = letters[letterIdx]
+      wsAhsp.getCell(`B${jumlahRow}`).value = 'JUMLAH (A+B+C)'
+      wsAhsp.getCell(`F${jumlahRow}`).value = f(parts.map((r) => `F${r}`).join('+') || '0')
+      wsAhsp.getCell(`F${jumlahRow}`).numFmt = CURRENCY_FMT
+      wsAhsp.getCell(`G${jumlahRow}`).value = f(parts.map((r) => `G${r}`).join('+') || '0')
+      wsAhsp.getCell(`G${jumlahRow}`).numFmt = CURRENCY_FMT
+      letterIdx++
+      ar++
+
+      const overheadRow = ar
+      wsAhsp.getCell(`A${overheadRow}`).value = letters[letterIdx]
+      wsAhsp.getCell(`B${overheadRow}`).value = f(`"OVERHEAD & PROFIT ("&Informasi!B6&"%)"`)
+      wsAhsp.getCell(`F${overheadRow}`).value = f(`F${jumlahRow}*(Informasi!B6/100)`)
+      wsAhsp.getCell(`F${overheadRow}`).numFmt = CURRENCY_FMT
+      wsAhsp.getCell(`G${overheadRow}`).value = f(
+        `IF(F${jumlahRow}>0,F${overheadRow}*(G${jumlahRow}/F${jumlahRow}),0)`
+      )
+      wsAhsp.getCell(`G${overheadRow}`).numFmt = CURRENCY_FMT
+      letterIdx++
+      ar++
+
+      const finalRow = ar
+      wsAhsp.getCell(`A${finalRow}`).value = letters[letterIdx]
+      wsAhsp.getCell(`B${finalRow}`).value = 'HARGA SATUAN PEKERJAAN'
+      wsAhsp.getCell(`F${finalRow}`).value = f(`F${jumlahRow}+F${overheadRow}`)
+      wsAhsp.getCell(`F${finalRow}`).numFmt = CURRENCY_FMT
+      wsAhsp.getCell(`F${finalRow}`).font = HEADER_FONT
+      wsAhsp.getCell(`G${finalRow}`).value = f(`G${jumlahRow}+G${overheadRow}`)
+      wsAhsp.getCell(`G${finalRow}`).numFmt = CURRENCY_FMT
+      wsAhsp.getCell(`G${finalRow}`).font = HEADER_FONT
+      ar += 2
+
+      ahspFinalRow.set(item.id, finalRow)
+    }
+  }
+
   // ================= SHEET: Rincian RAB =================
   const wsRab = wb.addWorksheet('Rincian RAB')
   wsRab.columns = [
-    { width: 6 }, // A no
-    { width: 45 }, // B uraian
-    { width: 2 }, // C spacer
-    { width: 8 }, // D sat
-    { width: 12 }, // E volume
-    { width: 18 }, // F harga satuan
-    { width: 20 }, // G jumlah harga
-    { width: 20 }, // H jumlah harga tkdn
-    { width: 10 }, // I tkdn %
+    { width: 6 }, { width: 45 }, { width: 2 }, { width: 8 }, { width: 12 }, { width: 18 }, { width: 20 }, { width: 20 }, { width: 10 },
   ]
   wsRab.getCell('A1').value = 'RENCANA ANGGARAN BIAYA'
   wsRab.getCell('A1').font = TITLE_FONT
@@ -81,15 +249,7 @@ export function buildRabWorkbook(project: Project, rabItems: RabItem[]) {
 
   const headerRow = 8
   const headers = [
-    'No',
-    'Uraian Pekerjaan',
-    '',
-    'Sat',
-    'Volume',
-    'Harga Satuan (Rp)',
-    'Jumlah Harga (Rp)',
-    'Jumlah Harga TKDN (Rp)',
-    'TKDN (%)',
+    'No', 'Uraian Pekerjaan', '', 'Sat', 'Volume', 'Harga Satuan (Rp)', 'Jumlah Harga (Rp)', 'Jumlah Harga TKDN (Rp)', 'TKDN (%)',
   ]
   headers.forEach((h, i) => {
     const cell = wsRab.getCell(headerRow, i + 1)
@@ -115,7 +275,13 @@ export function buildRabWorkbook(project: Project, rabItems: RabItem[]) {
       wsRab.getCell(`B${r}`).value = it.name
       wsRab.getCell(`D${r}`).value = it.unit
       wsRab.getCell(`E${r}`).value = it.volume
-      wsRab.getCell(`F${r}`).value = it.unit_price
+
+      const ahspRow = it.ahsp_item_id ? ahspFinalRow.get(it.ahsp_item_id) : undefined
+      if (ahspRow) {
+        wsRab.getCell(`F${r}`).value = f(`AHSP!F${ahspRow}`)
+      } else {
+        wsRab.getCell(`F${r}`).value = it.unit_price
+      }
       wsRab.getCell(`F${r}`).numFmt = CURRENCY_FMT
       wsRab.getCell(`G${r}`).value = f(`E${r}*F${r}`)
       wsRab.getCell(`G${r}`).numFmt = CURRENCY_FMT

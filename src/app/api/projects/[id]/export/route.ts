@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { buildRabWorkbook } from '@/lib/export-excel'
-import type { Project, RabItem } from '@/types/database'
+import { buildRabWorkbook, type AhspDetail } from '@/lib/export-excel'
+import type { Project, RabItem, AhspItem, AhspComponent } from '@/types/database'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -23,7 +23,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .order('created_at', { ascending: true })
     .returns<RabItem[]>()
 
-  const wb = buildRabWorkbook(project, items ?? [])
+  const rabItems = items ?? []
+
+  const ahspItemIds = Array.from(
+    new Set(rabItems.map((it) => it.ahsp_item_id).filter((v): v is string => !!v))
+  )
+
+  let ahspDetails: AhspDetail[] = []
+  if (ahspItemIds.length > 0) {
+    const [{ data: ahspItems }, { data: components }] = await Promise.all([
+      supabase.from('ahsp_items').select('*').in('id', ahspItemIds).returns<AhspItem[]>(),
+      supabase.from('ahsp_components').select('*').in('ahsp_item_id', ahspItemIds).returns<AhspComponent[]>(),
+    ])
+    ahspDetails = (ahspItems ?? []).map((item) => ({
+      item,
+      components: (components ?? []).filter((c) => c.ahsp_item_id === item.id),
+    }))
+  }
+
+  const wb = buildRabWorkbook(project, rabItems, ahspDetails)
   const buffer = await wb.xlsx.writeBuffer()
   const filename = `RAB_${project.name.replace(/[^a-zA-Z0-9]+/g, '_')}.xlsx`
 

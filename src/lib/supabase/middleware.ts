@@ -31,7 +31,11 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/register')
   const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard') ||
     request.nextUrl.pathname.startsWith('/projects') ||
-    request.nextUrl.pathname.startsWith('/ahsp')
+    request.nextUrl.pathname.startsWith('/ahsp') ||
+    request.nextUrl.pathname.startsWith('/materials') ||
+    request.nextUrl.pathname.startsWith('/templates') ||
+    request.nextUrl.pathname.startsWith('/labours') ||
+    request.nextUrl.pathname.startsWith('/purchasing')
 
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone()

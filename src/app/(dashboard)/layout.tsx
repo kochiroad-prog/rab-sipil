@@ -29,6 +29,15 @@ export default async function DashboardLayout({
             <Link href="/ahsp" className="text-slate-600 hover:text-slate-900">
               Database AHSP
             </Link>
+            <Link href="/materials" className="text-slate-600 hover:text-slate-900">
+              Material
+            </Link>
+            <Link href="/templates" className="text-slate-600 hover:text-slate-900">
+              Template
+            </Link>
+            <Link href="/labours" className="text-slate-600 hover:text-slate-900">
+              Tenaga Kerja
+            </Link>
             <span className="text-slate-400">{user?.email}</span>
             <form action={logout}>
               <button className="rounded-md border border-slate-300 px-3 py-1.5 text-slate-700 hover:bg-slate-100">

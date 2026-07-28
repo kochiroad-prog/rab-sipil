@@ -112,6 +112,31 @@ export async function deleteRabItem(formData: FormData) {
   revalidatePath(`/projects/${project_id}`)
 }
 
+export type DraftItemInput = { name: string; unit: string; volume: number }
+
+/** Insert batch draft item hasil AI Estimator (setelah diverifikasi user) sebagai rab_items baru. */
+export async function insertDraftItems(projectId: string, section: string | null, items: DraftItemInput[]) {
+  const supabase = await createClient()
+  if (!projectId || items.length === 0) return { error: null }
+
+  const rows = items
+    .filter((it) => it.name && it.unit)
+    .map((it) => ({
+      project_id: projectId,
+      section,
+      name: it.name,
+      unit: it.unit,
+      volume: it.volume || 0,
+      unit_price: 0,
+    }))
+
+  if (rows.length === 0) return { error: null }
+
+  const { error } = await supabase.from('rab_items').insert(rows)
+  revalidatePath(`/projects/${projectId}`)
+  return { error: error?.message ?? null }
+}
+
 export async function fillFromAhsp(formData: FormData) {
   const supabase = await createClient()
   const project_id = String(formData.get('project_id') ?? '')

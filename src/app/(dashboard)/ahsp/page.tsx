@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import type { AhspItem, AhspCategory } from '@/types/database'
 import { addAhspItem, deleteAhspItem } from './actions'
@@ -54,20 +55,20 @@ export default async function AhspPage({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <a
+        <Link
           href="/ahsp"
           className={`rounded-md px-3 py-1.5 text-sm ${!bidang ? 'bg-slate-900 text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'}`}
         >
           Semua Bidang
-        </a>
+        </Link>
         {Object.entries(BIDANG_LABEL).map(([key, label]) => (
-          <a
+          <Link
             key={key}
             href={`/ahsp?bidang=${key}`}
             className={`rounded-md px-3 py-1.5 text-sm ${bidang === key ? 'bg-slate-900 text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'}`}
           >
             {label}
-          </a>
+          </Link>
         ))}
       </div>
 
@@ -114,7 +115,11 @@ export default async function AhspPage({
               <tr key={it.id}>
                 <td className="px-4 py-3 text-slate-500">{it.code ?? '-'}</td>
                 <td className="px-4 py-3 text-slate-600">{it.ahsp_categories?.name ?? '-'}</td>
-                <td className="px-4 py-3 text-slate-900">{it.name}</td>
+                <td className="px-4 py-3">
+                  <Link href={`/ahsp/${it.id}`} className="text-slate-900 underline">
+                    {it.name}
+                  </Link>
+                </td>
                 <td className="px-4 py-3 text-slate-600">{it.unit}</td>
                 <td className="px-4 py-3 text-right text-slate-600">{formatRupiah(it.unit_price)}</td>
                 <td className="px-4 py-3 text-right text-slate-600">{it.tkdn_percent > 0 ? `${it.tkdn_percent}%` : '-'}</td>

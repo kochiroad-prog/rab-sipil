@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Project, RabItem, AhspItem, AhspCategory } from '@/types/database'
 import AiAssist from '@/components/AiAssist'
+import VisionEstimator from '@/components/VisionEstimator'
 import RabItemPriceEditor from '@/components/RabItemPriceEditor'
 import ProjectSettings from '@/components/ProjectSettings'
 import { addRabItem, deleteRabItem, deleteProject } from '../actions'
@@ -64,6 +65,18 @@ export default async function ProjectDetailPage({
           >
             Backup Volume
           </Link>
+          <Link
+            href={`/projects/${project.id}/manpower`}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+          >
+            Rencana Tenaga Kerja
+          </Link>
+          <Link
+            href={`/projects/${project.id}/purchasing`}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+          >
+            Purchasing
+          </Link>
           <a
             href={`/api/projects/${project.id}/export`}
             className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
@@ -85,6 +98,8 @@ export default async function ProjectDetailPage({
         overheadPercent={project.overhead_percent}
         tahunAnggaran={project.tahun_anggaran}
       />
+
+      <VisionEstimator projectId={project.id} />
 
       <AiAssist />
 
