@@ -429,6 +429,82 @@ export type WarehouseTransaction = {
   created_at: string
 }
 
+export type SpkStatus = 'draft' | 'agreed' | 'in_progress' | 'done' | 'cancelled'
+export type SpkApproverRole = 'project_manager' | 'designer' | 'finance' | 'admin' | 'pengawas' | 'spv_sales' | 'pemborong'
+
+export type SpkApproval = {
+  name?: string
+  signature_url?: string
+  signed_at?: string
+}
+
+export type ManpowerSpk = {
+  id: string
+  owner_id: string
+  project_id: string
+  manpower_plan_id: string | null
+  spk_number: string | null
+  client_name: string | null
+  worker_name: string | null
+  worker_phone: string | null
+  spk_date: string
+  start_date: string | null
+  end_date: string | null
+  grand_total: number
+  status: SpkStatus
+  sanksi_text: string | null
+  note: string | null
+  approvals: Partial<Record<SpkApproverRole, SpkApproval>>
+  created_at: string
+  updated_at: string
+}
+
+export type ManpowerSpkItem = {
+  id: string
+  spk_id: string
+  description: string | null
+  qty: number
+  unit: string | null
+  price: number
+  total: number
+  sort: number
+}
+
+export type ManpowerSpkClause = {
+  id: string
+  spk_id: string
+  title: string | null
+  body: string | null
+  sort: number
+}
+
+export type SpkClauseTemplate = {
+  id: string
+  owner_id: string
+  title: string | null
+  body: string | null
+  sort: number
+  created_at: string
+}
+
+export type LabourTerminStatus = 'pending' | 'paid'
+
+export type LabourTermin = {
+  id: string
+  owner_id: string
+  spk_id: string | null
+  project_id: string | null
+  worker_name: string | null
+  description: string | null
+  amount: number
+  status: LabourTerminStatus
+  proof_url: string | null
+  paid_at: string | null
+  note: string | null
+  sort: number
+  created_at: string
+}
+
 export type ElementType = 'kolom' | 'balok' | 'sloof' | 'plat'
 
 export type StructuralElement = {

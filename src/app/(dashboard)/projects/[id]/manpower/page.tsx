@@ -34,7 +34,15 @@ export default async function ManpowerPage({
         <Link href={`/projects/${id}`} className="text-sm text-slate-500 hover:underline">
           &larr; Kembali ke {project.name}
         </Link>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-900">Rencana Tenaga Kerja</h1>
+        <div className="mt-1 flex items-center justify-between">
+          <h1 className="text-2xl font-semibold text-slate-900">Rencana Tenaga Kerja</h1>
+          <Link
+            href={`/projects/${id}/manpower/spk`}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+          >
+            SPK &amp; Upah Kerja
+          </Link>
+        </div>
       </div>
 
       {!rabItemCount ? (
