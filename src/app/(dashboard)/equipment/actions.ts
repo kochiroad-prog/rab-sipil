@@ -42,6 +42,7 @@ export async function addEquipment(formData: FormData) {
     next_service_date: strOrNull(formData, 'next_service_date'),
     service_interval_months: numOrNull(formData, 'service_interval_months'),
     notes: strOrNull(formData, 'notes'),
+    image_url: strOrNull(formData, 'image_url'),
   })
 
   revalidatePath('/equipment')
@@ -68,6 +69,7 @@ export async function updateEquipment(formData: FormData) {
       next_service_date: strOrNull(formData, 'next_service_date'),
       service_interval_months: numOrNull(formData, 'service_interval_months'),
       notes: strOrNull(formData, 'notes'),
+      image_url: strOrNull(formData, 'image_url'),
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)

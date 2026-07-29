@@ -21,6 +21,8 @@ export async function addLabour(formData: FormData) {
     daily_rate: Number(formData.get('daily_rate') ?? 0),
     borongan_multiplier: Number(formData.get('borongan_multiplier') ?? 1),
     notes: String(formData.get('notes') ?? '').trim() || null,
+    photo_url: String(formData.get('photo_url') ?? '').trim() || null,
+    ktp_url: String(formData.get('ktp_url') ?? '').trim() || null,
   })
 
   revalidatePath('/labours')

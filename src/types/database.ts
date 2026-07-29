@@ -79,6 +79,7 @@ export type Material = {
   specification: string | null
   tkdn_percent: number
   supplier_id: string | null
+  image_url: string | null
   created_at: string
   updated_at: string
 }
@@ -158,6 +159,8 @@ export type Labour = {
   daily_rate: number
   borongan_multiplier: number
   notes: string | null
+  photo_url: string | null
+  ktp_url: string | null
   created_at: string
   updated_at: string
 }
@@ -277,6 +280,7 @@ export type Equipment = {
   next_service_date: string | null
   service_interval_months: number | null
   notes: string | null
+  image_url: string | null
   created_at: string
   updated_at: string
 }

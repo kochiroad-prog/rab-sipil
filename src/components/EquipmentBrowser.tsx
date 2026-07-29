@@ -111,13 +111,21 @@ export default function EquipmentBrowser({
                 <tr key={e.id}>
                   <td className="px-4 py-3 text-slate-500">{CATEGORY_LABEL[e.category] ?? e.category}</td>
                   <td className="px-4 py-3 text-slate-900">
-                    <Link href={`/equipment/${e.id}`} className="hover:underline">
-                      {e.name}
-                    </Link>
-                    {e.code ? <span className="ml-1 text-xs text-slate-400">[{e.code}]</span> : null}
-                    {(e.brand || e.model) && (
-                      <p className="text-xs text-slate-400">{[e.brand, e.model].filter(Boolean).join(' ')}</p>
-                    )}
+                    <div className="flex items-start gap-2">
+                      {e.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={e.image_url} alt={e.name} className="h-8 w-8 shrink-0 rounded object-cover" />
+                      ) : null}
+                      <div>
+                        <Link href={`/equipment/${e.id}`} className="hover:underline">
+                          {e.name}
+                        </Link>
+                        {e.code ? <span className="ml-1 text-xs text-slate-400">[{e.code}]</span> : null}
+                        {(e.brand || e.model) && (
+                          <p className="text-xs text-slate-400">{[e.brand, e.model].filter(Boolean).join(' ')}</p>
+                        )}
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-xs ${CONDITION_BADGE[e.condition] ?? 'bg-slate-100 text-slate-600'}`}>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { addMaterial } from '@/app/(dashboard)/materials/actions'
 import type { MaterialKind, Supplier } from '@/types/database'
+import PhotoUploadInput from '@/components/PhotoUploadInput'
 
 const CATEGORIES = [
   ['semen', 'Semen'],
@@ -85,6 +86,7 @@ export default function MaterialForm({ suppliers = [] }: { suppliers?: Supplier[
             <option key={s.id} value={s.id}>{s.name}{s.city ? ` - ${s.city}` : ''}</option>
           ))}
         </select>
+        <PhotoUploadInput name="image_url" bucket="material-images" label="Foto (opsional)" className="sm:col-span-2" />
 
         <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:col-span-1">
           Tambah

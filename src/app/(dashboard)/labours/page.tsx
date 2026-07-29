@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import type { Labour, WorkActivity } from '@/types/database'
 import { addLabour, deleteLabour, addWorkActivity, deleteWorkActivity } from './actions'
+import PhotoUploadInput from '@/components/PhotoUploadInput'
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
@@ -55,6 +56,8 @@ export default async function LaboursPage() {
           </select>
           <input name="name" required placeholder="Nama" className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-1" />
           <input name="daily_rate" type="number" step="1000" required placeholder="Upah harian" className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-1" />
+          <PhotoUploadInput name="photo_url" bucket="labour-photos" label="Foto Profil (opsional)" className="sm:col-span-3" />
+          <PhotoUploadInput name="ktp_url" bucket="labour-photos" label="KTP / Identitas (opsional)" className="sm:col-span-3" />
           <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:col-span-1">
             Tambah
           </button>
@@ -64,6 +67,7 @@ export default async function LaboursPage() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-slate-500">
               <tr>
+                <th className="px-4 py-3 font-medium"></th>
                 <th className="px-4 py-3 font-medium">Kategori</th>
                 <th className="px-4 py-3 font-medium">Level</th>
                 <th className="px-4 py-3 font-medium">Nama</th>
@@ -73,10 +77,18 @@ export default async function LaboursPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {(labours ?? []).length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">Belum ada data.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">Belum ada data.</td></tr>
               )}
               {(labours ?? []).map((l) => (
                 <tr key={l.id}>
+                  <td className="px-4 py-3">
+                    {l.photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={l.photo_url} alt={l.name} className="h-8 w-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="h-8 w-8 rounded-full bg-slate-100" />
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-slate-500">{SKILL_LABEL[l.kategori]}</td>
                   <td className="px-4 py-3 text-slate-600 capitalize">{l.level}</td>
                   <td className="px-4 py-3 text-slate-900">{l.name}</td>

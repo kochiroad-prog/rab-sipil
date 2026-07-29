@@ -69,10 +69,18 @@ export default function MaterialsBrowser({ materials, userId }: { materials: Mat
               <tr key={m.id}>
                 <td className="px-4 py-3 text-slate-500">{CATEGORY_LABEL[m.category] ?? m.category}</td>
                 <td className="px-4 py-3 text-slate-900">
-                  {m.name}
-                  {m.brand ? <span className="ml-1 text-xs text-slate-400">({m.brand})</span> : null}
-                  {m.specification && <p className="text-xs text-slate-400">{m.specification}</p>}
-                  {m.suppliers?.name && <p className="text-xs text-blue-600">Supplier: {m.suppliers.name}</p>}
+                  <div className="flex items-start gap-2">
+                    {m.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.image_url} alt={m.name} className="h-8 w-8 shrink-0 rounded object-cover" />
+                    ) : null}
+                    <div>
+                      {m.name}
+                      {m.brand ? <span className="ml-1 text-xs text-slate-400">({m.brand})</span> : null}
+                      {m.specification && <p className="text-xs text-slate-400">{m.specification}</p>}
+                      {m.suppliers?.name && <p className="text-xs text-blue-600">Supplier: {m.suppliers.name}</p>}
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-slate-600">{m.unit}</td>
                 <td className="px-4 py-3 text-right text-slate-600">

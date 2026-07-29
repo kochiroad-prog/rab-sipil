@@ -1,6 +1,7 @@
 'use client'
 
 import { addEquipment } from '@/app/(dashboard)/equipment/actions'
+import PhotoUploadInput from '@/components/PhotoUploadInput'
 
 const CATEGORIES = [
   ['alat_berat', 'Alat Berat'],
@@ -57,6 +58,7 @@ export default function EquipmentForm() {
           <input name="service_interval_months" type="number" step="1" min="0" placeholder="mis. 6" className="mt-1 rounded-md border border-slate-300 px-3 py-2 text-sm" />
         </label>
         <input name="notes" placeholder="Catatan (opsional)" className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2" />
+        <PhotoUploadInput name="image_url" bucket="equipment-images" label="Foto (opsional)" className="sm:col-span-2" />
 
         <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:col-span-1">
           Tambah
