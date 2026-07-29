@@ -4,15 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import type { Project, RabItem } from '@/types/database'
 import AiAssist from '@/components/AiAssist'
 import VisionEstimator from '@/components/VisionEstimator'
-import RabItemPriceEditor from '@/components/RabItemPriceEditor'
 import ProjectSettings from '@/components/ProjectSettings'
 import AddRabItemForm from '@/components/AddRabItemForm'
+import RabItemsTable from '@/components/RabItemsTable'
 import type { AhspOption } from '@/components/AhspCombobox'
-import { deleteRabItem, deleteProject } from '../actions'
-
-function formatRupiah(n: number) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
-}
+import { deleteProject } from '../actions'
 
 export default async function ProjectDetailPage({
   params,
@@ -57,11 +53,6 @@ export default async function ProjectDetailPage({
   }))
 
   const rabItems = items ?? []
-  const subtotal = rabItems.reduce((sum, it) => sum + it.volume * it.unit_price, 0)
-  const ppn = (subtotal * project.ppn_percent) / 100
-  const total = subtotal + ppn
-  const totalNilaiTkdn = rabItems.reduce((sum, it) => sum + it.volume * it.unit_price * (it.tkdn_percent / 100), 0)
-  const tkdnProjectPercent = subtotal > 0 ? (totalNilaiTkdn / subtotal) * 100 : 0
 
   return (
     <div className="space-y-8">
@@ -125,78 +116,7 @@ export default async function ProjectDetailPage({
 
       <AddRabItemForm projectId={project.id} ahspItems={ahspItems} />
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
-            <tr>
-              <th className="px-4 py-3 font-medium">Kategori</th>
-              <th className="px-4 py-3 font-medium">Uraian Pekerjaan</th>
-              <th className="px-4 py-3 font-medium">Satuan</th>
-              <th className="px-4 py-3 text-right font-medium">Volume</th>
-              <th className="px-4 py-3 text-right font-medium">Harga Satuan</th>
-              <th className="px-4 py-3 text-right font-medium">Jumlah</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {rabItems.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
-                  Belum ada item RAB.
-                </td>
-              </tr>
-            )}
-            {rabItems.map((it) => (
-              <tr key={it.id}>
-                <td className="px-4 py-3 text-slate-500">{it.section ?? '-'}</td>
-                <td className="px-4 py-3 text-slate-900">{it.name}</td>
-                <td className="px-4 py-3 text-slate-600">{it.unit}</td>
-                <td className="px-4 py-3 text-right text-slate-600">{it.volume}</td>
-                <td className="px-4 py-3 text-right text-slate-600">
-                  <RabItemPriceEditor
-                    id={it.id}
-                    projectId={project.id}
-                    unitPrice={it.unit_price}
-                    tkdnPercent={it.tkdn_percent}
-                  />
-                </td>
-                <td className="px-4 py-3 text-right font-medium text-slate-900">
-                  {formatRupiah(it.volume * it.unit_price)}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <form action={deleteRabItem}>
-                    <input type="hidden" name="id" value={it.id} />
-                    <input type="hidden" name="project_id" value={project.id} />
-                    <button className="text-xs text-red-600 hover:underline">Hapus</button>
-                  </form>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot className="border-t border-slate-200 text-sm">
-            <tr>
-              <td colSpan={5} className="px-4 py-2 text-right text-slate-500">Subtotal</td>
-              <td className="px-4 py-2 text-right font-medium text-slate-900">{formatRupiah(subtotal)}</td>
-              <td />
-            </tr>
-            <tr>
-              <td colSpan={5} className="px-4 py-2 text-right text-slate-500">PPN ({project.ppn_percent}%)</td>
-              <td className="px-4 py-2 text-right font-medium text-slate-900">{formatRupiah(ppn)}</td>
-              <td />
-            </tr>
-            <tr>
-              <td colSpan={5} className="px-4 py-3 text-right font-semibold text-slate-900">Total RAB</td>
-              <td className="px-4 py-3 text-right text-base font-semibold text-slate-900">{formatRupiah(total)}</td>
-              <td />
-            </tr>
-            <tr>
-              <td colSpan={5} className="px-4 py-2 text-right text-emerald-700">Nilai TKDN Proyek</td>
-              <td className="px-4 py-2 text-right font-medium text-emerald-700">{tkdnProjectPercent.toFixed(1)}%</td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+      <RabItemsTable projectId={project.id} items={rabItems} ppnPercent={project.ppn_percent} />
     </div>
   )
 }
