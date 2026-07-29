@@ -365,6 +365,7 @@ export type PurchaseOrder = {
   total_amount: number
   retensi_pct: number
   payment_id: string | null
+  received: boolean
   note: string | null
   created_at: string
   updated_at: string
@@ -373,6 +374,7 @@ export type PurchaseOrder = {
 export type PurchaseOrderItem = {
   id: string
   po_id: string
+  material_id: string | null
   material_name: string
   qty: number
   unit: string
@@ -390,6 +392,40 @@ export type PurchasePayment = {
   note: string | null
   po_ids: string[]
   paid_at: string
+  created_at: string
+}
+
+export type ProjectWarehouse = {
+  id: string
+  owner_id: string
+  project_id: string
+  name: string
+  address: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export type WarehouseStock = {
+  id: string
+  warehouse_id: string
+  material_id: string
+  qty: number
+  avg_cost: number
+  updated_at: string
+}
+
+export type WarehouseTransactionType = 'masuk' | 'keluar'
+
+export type WarehouseTransaction = {
+  id: string
+  warehouse_id: string
+  material_id: string
+  type: WarehouseTransactionType
+  qty: number
+  unit_price: number
+  reference: string | null
+  note: string | null
+  created_by: string | null
   created_at: string
 }
 

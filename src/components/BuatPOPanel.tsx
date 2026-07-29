@@ -78,7 +78,13 @@ export default function BuatPOPanel({
                 type="hidden"
                 name="items_json"
                 value={JSON.stringify(
-                  checkedRows.map((r) => ({ materialName: r.materialName, qty: r.purchaseQty, unit: r.purchaseUnit, unitPrice: r.unitPrice }))
+                  checkedRows.map((r) => ({
+                    materialId: r.matchedId,
+                    materialName: r.materialName,
+                    qty: r.purchaseQty,
+                    unit: r.purchaseUnit,
+                    unitPrice: r.unitPrice,
+                  }))
                 )}
               />
               <label className="flex items-center gap-1.5 text-xs text-slate-500">

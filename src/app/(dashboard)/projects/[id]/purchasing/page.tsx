@@ -84,6 +84,25 @@ export default async function PurchasingPage({
     .returns<PurchaseOrder[]>()
   const purchaseOrders = posRaw ?? []
 
+  const { data: warehouse } = await supabase
+    .from('project_warehouses')
+    .select('id')
+    .eq('project_id', id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  const stockByMaterialId: Record<string, number> = {}
+  if (warehouse) {
+    const { data: stockRaw } = await supabase
+      .from('warehouse_stock')
+      .select('material_id, qty')
+      .eq('warehouse_id', warehouse.id)
+    for (const s of stockRaw ?? []) {
+      stockByMaterialId[s.material_id] = s.qty
+    }
+  }
+
   const totalBelanja = purchaseOrders.filter((p) => p.status !== 'cancelled').reduce((s, p) => s + p.total_amount, 0)
   const totalDibayar = purchaseOrders.filter((p) => p.status === 'paid').reduce((s, p) => s + p.total_amount, 0)
   const sisaBelanja = totalBelanja - totalDibayar
@@ -101,14 +120,22 @@ export default async function PurchasingPage({
             Item RAB tanpa referensi AHSP atau AHSP tanpa komposisi bahan tidak ikut terhitung di sini.
           </p>
         </div>
-        {rows.length > 0 && (
-          <a
-            href={`/api/projects/${id}/purchasing-export`}
-            className="shrink-0 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+        <div className="flex shrink-0 gap-2">
+          <Link
+            href={`/projects/${id}/warehouse`}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
           >
-            Export Excel
-          </a>
-        )}
+            Gudang Proyek
+          </Link>
+          {rows.length > 0 && (
+            <a
+              href={`/api/projects/${id}/purchasing-export`}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+            >
+              Export Excel
+            </a>
+          )}
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -124,7 +151,7 @@ export default async function PurchasingPage({
               Cek kolom &quot;Kebutuhan&quot; (satuan asli AHSP) vs satuan di halaman <Link href="/materials" className="underline">Database Material</Link>, lalu samakan satuannya (mis. ubah satuan komponen di AHSP jadi sak, bukan kg).
             </p>
           )}
-          <PurchasingTable rows={rows} />
+          <PurchasingTable rows={rows} stockByMaterialId={stockByMaterialId} />
 
           <BuatPOPanel projectId={id} rows={rows} supplierByMaterialId={supplierByMaterialId} />
         </>

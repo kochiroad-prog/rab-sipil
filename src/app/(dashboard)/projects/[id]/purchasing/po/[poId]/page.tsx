@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { CompanyProfile, Project, PurchaseOrder, PurchaseOrderItem } from '@/types/database'
 import PrintButton from '@/components/PrintButton'
 import { recordInvoice } from '@/app/(dashboard)/purchasing/actions'
+import { receivePurchaseOrderToWarehouse } from '../../../warehouse/actions'
 import { cancelPurchaseOrder } from '../../po-actions'
 
 function formatRupiah(n: number) {
@@ -48,6 +49,14 @@ export default async function PurchaseOrderDetailPage({
     .eq('owner_id', user?.id ?? '')
     .maybeSingle<CompanyProfile>()
 
+  const { data: warehouse } = await supabase
+    .from('project_warehouses')
+    .select('id')
+    .eq('project_id', id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
   const retensi = (po.total_amount * po.retensi_pct) / 100
 
   return (
@@ -65,6 +74,19 @@ export default async function PurchaseOrderDetailPage({
                 Batalkan PO
               </button>
             </form>
+          )}
+          {!po.received && po.status !== 'cancelled' && warehouse && (
+            <form action={receivePurchaseOrderToWarehouse}>
+              <input type="hidden" name="po_id" value={po.id} />
+              <input type="hidden" name="warehouse_id" value={warehouse.id} />
+              <input type="hidden" name="project_id" value={id} />
+              <button className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800">
+                Terima ke Gudang
+              </button>
+            </form>
+          )}
+          {po.received && (
+            <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">Sudah diterima di gudang</span>
           )}
           <PrintButton label="Cetak PO" />
         </div>

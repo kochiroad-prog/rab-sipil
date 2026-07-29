@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 
-type ItemPayload = { materialName: string; qty: number; unit: string; unitPrice: number }
+type ItemPayload = { materialId: string | null; materialName: string; qty: number; unit: string; unitPrice: number }
 
 export async function createPurchaseOrder(formData: FormData) {
   const supabase = await createClient()
@@ -48,6 +48,7 @@ export async function createPurchaseOrder(formData: FormData) {
 
   const rows = items.map((it, idx) => ({
     po_id: po.id,
+    material_id: it.materialId,
     material_name: it.materialName,
     qty: it.qty,
     unit: it.unit,
