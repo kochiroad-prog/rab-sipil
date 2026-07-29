@@ -80,6 +80,12 @@ export default async function ProjectDetailPage({
             Backup Volume
           </Link>
           <Link
+            href={`/projects/${project.id}/from-template`}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+          >
+            Terapkan Template
+          </Link>
+          <Link
             href={`/projects/${project.id}/manpower`}
             className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
           >

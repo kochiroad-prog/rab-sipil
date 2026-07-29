@@ -66,10 +66,12 @@ export async function addTemplateItem(formData: FormData) {
   const name = String(formData.get('name') ?? '').trim()
   const unit = String(formData.get('unit') ?? '').trim()
   const ahsp_item_id = String(formData.get('ahsp_item_id') ?? '') || null
+  const formula = String(formData.get('formula') ?? '').trim() || null
+  const coefficient = Number(formData.get('coefficient') ?? 1) || 1
 
   if (!template_id || !name || !unit) return
 
-  await supabase.from('job_template_items').insert({ template_id, name, unit, ahsp_item_id })
+  await supabase.from('job_template_items').insert({ template_id, name, unit, ahsp_item_id, formula, coefficient })
   revalidatePath(`/templates/${template_id}`)
 }
 
@@ -78,5 +80,18 @@ export async function deleteTemplateItem(formData: FormData) {
   const id = String(formData.get('id') ?? '')
   const template_id = String(formData.get('template_id') ?? '')
   await supabase.from('job_template_items').delete().eq('id', id)
+  revalidatePath(`/templates/${template_id}`)
+}
+
+export async function updateTemplateItemFormula(formData: FormData) {
+  const supabase = await createClient()
+  const id = String(formData.get('id') ?? '')
+  const template_id = String(formData.get('template_id') ?? '')
+  const formula = String(formData.get('formula') ?? '').trim() || null
+  const coefficient = Number(formData.get('coefficient') ?? 1) || 1
+
+  if (!id) return
+
+  await supabase.from('job_template_items').update({ formula, coefficient }).eq('id', id)
   revalidatePath(`/templates/${template_id}`)
 }

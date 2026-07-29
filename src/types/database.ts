@@ -128,6 +128,8 @@ export type JobTemplateItem = {
   ahsp_item_id: string | null
   name: string
   unit: string
+  formula: string | null
+  coefficient: number
   sort_order: number
 }
 
