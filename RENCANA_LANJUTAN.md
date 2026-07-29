@@ -214,10 +214,62 @@ sebelumnya.
 
 ---
 
-## 9. Ringkasan Keputusan yang Perlu Dikonfirmasi Sebelum Eksekusi
+## 9. Keputusan yang Sudah Dikonfirmasi (29 Juli 2026)
 
-1. **Fase B** — alur PO penuh (PO → Invoice → Bayar) atau versi ringkas (langsung tandai siap bayar)? Bukti transfer/invoice disimpan base64 atau Supabase Storage bucket?
-2. **Fase C** — role penyetuju SPK yang dipakai, dan klausul wajib khas proyek Anda (di luar 5 klausul standar yang diusulkan)?
-3. **Fase E** — mau dikerjakan sama sekali atau di-skip? Kalau ya, instance WA baru apa yang dipakai?
+1. **Fase B** — alur **penuh**: PO → Invoice → Bayar. Bukti transfer/invoice disimpan sebagai
+   data URL (base64), konsisten dengan pola tanda tangan digital di Peminjaman Alat — tanpa
+   setup Supabase Storage bucket baru.
+2. **Fase C** — disamakan dengan RAB Estima: 6 role penyetuju tetap (Project Manager, Designer,
+   Finance, Admin, Pengawas, SPV Sales) + Pemborong, tab "SPK" digabung ke halaman Manpower,
+   5 klausul default (isi disesuaikan konteks konstruksi), tanda tangan digital reuse `SignaturePad`.
+3. **Fase E** — **dikerjakan sekaligus** (bukan ditunda). Nama instance WhatsApp akan diisi user
+   belakangan lewat halaman Notifikasi WA (field kosong dulu saat build, sama seperti pola
+   ganti-instance di RAB Estima).
+4. **Gudang — berubah arah, TETAP diperlukan.** Bukan gudang terpusat lintas proyek seperti RAB
+   Estima, tapi **per-lokasi-proyek**: mayoritas material disimpan di **direksi keet** (kantor/gudang
+   sementara di lokasi proyek). Ditambahkan sebagai **Fase B2** (lihat di bawah), diselipkan
+   setelah Fase B karena berkaitan langsung dengan alur PO (barang datang → masuk stok gudang proyek).
 
-*Dokumen rencana. Tidak ada kode/DB yang diubah — baik di Estimator Sipil maupun RAB Estima — sampai Anda menyetujui salah satu fase untuk mulai dieksekusi.*
+---
+
+## 10. FASE B2 — Gudang per-Proyek (Direksi Keet)
+
+**Tujuan:** setiap proyek sipil punya lokasi penyimpanan sendiri di lapangan (direksi keet).
+Material yang datang dicatat masuk, pemakaian dicatat keluar, sisa stok kelihatan — dan
+Purchasing bisa memperhitungkan stok sisa sebelum membeli lagi. **Beda dari RAB Estima**: tidak
+ada gudang terpusat lintas proyek — gudang **melekat ke satu proyek**.
+
+**Tabel baru**
+- `project_warehouses`: `id, project_id (FK), owner_id, name (default "Direksi Keet"), address, is_active, created_at`. Satu proyek bisa punya lebih dari satu lokasi (mis. direksi keet + gudang terbuka), tapi defaultnya 1 baris otomatis per proyek baru.
+- `warehouse_stock`: `id, warehouse_id (FK), material_id (FK materials), qty, avg_cost, updated_at` — saldo stok berjalan per material per gudang.
+- `warehouse_transactions`: `id, warehouse_id (FK), material_id (FK), type (masuk/keluar), qty, unit_price, reference (mis. no. PO), note, created_by, created_at`.
+
+**Menu** (di bawah halaman proyek, sejajar Purchasing/Manpower)
+- `/projects/[id]/warehouse` — tab **Stok** (saldo per material), **Barang Masuk** (form terima barang, opsional link ke PO dari Fase B), **Barang Keluar** (form pemakaian/keluar lapangan), **Atur Gudang** (nama/lokasi direksi keet).
+- Saat PO (Fase B) berstatus terkirim/diterima → tombol "Catat Barang Masuk" langsung isi otomatis dari item PO.
+- Rekap Purchasing (halaman yang sudah ada) menambahkan kolom **Stok Tersedia** & **Perlu Beli** = kebutuhan − stok gudang proyek — meniru ide RAB Estima tapi lingkupnya per-proyek, bukan lintas-proyek.
+
+**Ketergantungan:** dikerjakan setelah **Fase B** (butuh struktur PO untuk tautan Barang Masuk),
+sebelum Fase C/D.
+
+---
+
+## 11. Urutan Eksekusi Final
+
+```
+Fase A (Servis Alat)
+   ↓
+Fase B (Purchasing: PO → Invoice → Pembayaran)
+   ↓
+Fase B2 (Gudang per-Proyek / Direksi Keet) — terhubung ke PO Fase B
+   ↓
+Fase C (Upah Kerja & SPK Manpower) — pembayaran termin reuse modul Fase B
+   ↓
+Fase D (Laporan lintas proyek) — butuh data realisasi dari B/B2/C
+   ↓
+Fase E (Notifikasi WhatsApp) — dikerjakan sekaligus, instance diisi user belakangan
+```
+
+Tiap fase: migration → actions → UI → verifikasi (`tsc`/`eslint`/`next build`) → commit
+terpisah, mengikuti pola kerja sesi-sesi sebelumnya. Tidak ada kode/DB RAB Estima yang disentuh
+di proses ini.
