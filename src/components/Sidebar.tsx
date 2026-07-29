@@ -3,68 +3,41 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import {
-  LayoutDashboard,
-  Building2,
-  ListChecks,
-  Package,
-  LayoutTemplate,
-  Users,
-  Ruler,
-  Truck,
-  HardHat,
-  Settings,
-  FileText,
-  Wallet,
-  Banknote,
-  BarChart3,
-  MessageSquare,
-  LogOut,
-  Menu,
-  X,
-} from 'lucide-react'
-
-const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/projects', label: 'Proyek', icon: Building2 },
-  { href: '/ahsp', label: 'Database AHSP', icon: ListChecks },
-  { href: '/materials', label: 'Material', icon: Package },
-  { href: '/suppliers', label: 'Supplier', icon: Truck },
-  { href: '/equipment', label: 'Peralatan', icon: HardHat },
-  { href: '/purchasing/po', label: 'PO & Invoice', icon: FileText },
-  { href: '/purchasing/pembayaran', label: 'Pembayaran', icon: Wallet },
-  { href: '/upah-kerja', label: 'Upah Kerja', icon: Banknote },
-  { href: '/laporan', label: 'Laporan', icon: BarChart3 },
-  { href: '/volume-recipes', label: 'Resep Volume', icon: Ruler },
-  { href: '/templates', label: 'Template', icon: LayoutTemplate },
-  { href: '/labours', label: 'Tenaga Kerja', icon: Users },
-  { href: '/settings/company', label: 'Profil Perusahaan', icon: Settings },
-  { href: '/settings/whatsapp', label: 'Notifikasi WA', icon: MessageSquare },
-]
+import { LogOut, Menu, X } from 'lucide-react'
+import { NAV } from './nav-items'
 
 function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate: () => void }) {
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
 
   return (
-    <nav className="flex flex-1 flex-col gap-1 px-3">
-      {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-        const active = isActive(href)
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={onNavigate}
-            className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-              active
-                ? 'bg-white/15 font-medium text-white'
-                : 'text-blue-100 hover:bg-white/10 hover:text-white'
-            }`}
-          >
-            <Icon size={18} strokeWidth={1.75} />
-            {label}
-          </Link>
-        )
-      })}
+    <nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-3">
+      {NAV.map((g) => (
+        <div key={g.group}>
+          <div className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wider text-blue-200/70">
+            {g.group}
+          </div>
+          <div className="flex flex-col gap-1">
+            {g.items.map(({ href, label, icon: Icon }) => {
+              const active = isActive(href)
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={onNavigate}
+                  className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                    active
+                      ? 'bg-white/15 font-medium text-white'
+                      : 'text-blue-100 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <Icon size={18} strokeWidth={1.75} />
+                  {label}
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </nav>
   )
 }
