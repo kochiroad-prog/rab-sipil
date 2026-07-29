@@ -1,10 +1,12 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import type { Equipment, EquipmentLoan, Project } from '@/types/database'
+import type { Equipment, EquipmentLoan, EquipmentService, Project } from '@/types/database'
 import LoanForm from '@/components/LoanForm'
 import ReturnLoanForm from '@/components/ReturnLoanForm'
-import { deleteLoan } from '../actions'
+import EquipmentServiceForm from '@/components/EquipmentServiceForm'
+import { computeServiceStatus, SERVICE_STATUS_BADGE, SERVICE_STATUS_LABEL } from '@/lib/equipment-service-status'
+import { deleteLoan, deleteEquipmentService } from '../actions'
 
 const CATEGORY_LABEL: Record<string, string> = {
   alat_berat: 'Alat Berat',
@@ -52,6 +54,16 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
   const { data: projectsRaw } = await supabase.from('projects').select('*').order('name').returns<Project[]>()
   const projects = projectsRaw ?? []
 
+  const { data: servicesRaw } = await supabase
+    .from('equipment_services')
+    .select('*')
+    .eq('equipment_id', id)
+    .order('service_date', { ascending: false })
+    .returns<EquipmentService[]>()
+  const services = servicesRaw ?? []
+
+  const serviceStatus = computeServiceStatus(equipment.next_service_date)
+
   return (
     <div className="space-y-6">
       <div>
@@ -83,8 +95,18 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
         <div>
           <p className="text-xs text-slate-400">Servis Berikutnya</p>
           <p className="font-medium text-slate-800">{equipment.next_service_date ?? '-'}</p>
+          <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs ${SERVICE_STATUS_BADGE[serviceStatus.status]}`}>
+            {SERVICE_STATUS_LABEL[serviceStatus.status]}
+            {serviceStatus.status === 'terlambat' && serviceStatus.daysDiff !== null ? ` (${Math.abs(serviceStatus.daysDiff)} hari)` : ''}
+          </span>
         </div>
       </div>
+
+      {serviceStatus.status === 'terlambat' && !activeLoan && (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          Alat ini terlambat servis {serviceStatus.daysDiff !== null ? Math.abs(serviceStatus.daysDiff) : ''} hari. Tetap boleh dipinjamkan, tapi pertimbangkan servis dulu.
+        </p>
+      )}
 
       {activeLoan ? (
         <div className="rounded-xl border border-orange-200 bg-orange-50 p-5">
@@ -140,6 +162,49 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
                     )}
                     <form action={deleteLoan} className="inline">
                       <input type="hidden" name="id" value={l.id} />
+                      <input type="hidden" name="equipment_id" value={equipment.id} />
+                      <button className="text-xs text-red-600 hover:underline">Hapus</button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <EquipmentServiceForm equipmentId={equipment.id} currentInterval={equipment.service_interval_months} />
+
+      <div>
+        <h3 className="mb-2 font-medium text-slate-900">Riwayat Servis</h3>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-slate-500">
+              <tr>
+                <th className="px-4 py-3 font-medium">Tanggal</th>
+                <th className="px-4 py-3 font-medium">Jenis</th>
+                <th className="px-4 py-3 font-medium">Vendor</th>
+                <th className="px-4 py-3 text-right font-medium">Biaya</th>
+                <th className="px-4 py-3 font-medium">Catatan</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {services.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-6 text-center text-slate-500">Belum ada riwayat servis.</td>
+                </tr>
+              )}
+              {services.map((s) => (
+                <tr key={s.id}>
+                  <td className="px-4 py-3 text-slate-900">{s.service_date}</td>
+                  <td className="px-4 py-3 text-slate-600">{s.service_type}</td>
+                  <td className="px-4 py-3 text-slate-600">{s.vendor ?? '-'}</td>
+                  <td className="px-4 py-3 text-right text-slate-600">{formatRupiah(s.cost)}</td>
+                  <td className="px-4 py-3 text-slate-500">{s.notes ?? '-'}</td>
+                  <td className="px-4 py-3 text-right">
+                    <form action={deleteEquipmentService} className="inline">
+                      <input type="hidden" name="id" value={s.id} />
                       <input type="hidden" name="equipment_id" value={equipment.id} />
                       <button className="text-xs text-red-600 hover:underline">Hapus</button>
                     </form>

@@ -275,9 +275,26 @@ export type Equipment = {
   purchase_date: string | null
   purchase_price: number | null
   next_service_date: string | null
+  service_interval_months: number | null
   notes: string | null
   created_at: string
   updated_at: string
+}
+
+export type EquipmentServiceType = 'rutin' | 'perbaikan' | 'kalibrasi'
+
+export type EquipmentService = {
+  id: string
+  owner_id: string
+  equipment_id: string
+  service_date: string
+  service_type: EquipmentServiceType
+  cost: number
+  vendor: string | null
+  notes: string | null
+  receipt_url: string | null
+  next_service_date: string | null
+  created_at: string
 }
 
 export type LoanStatus = 'dipinjam' | 'dikembalikan' | 'hilang' | 'rusak'

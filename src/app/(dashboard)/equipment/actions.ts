@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { addMonths } from '@/lib/equipment-service-status'
 
 function numOrNull(formData: FormData, key: string) {
   const v = formData.get(key)
@@ -39,6 +40,7 @@ export async function addEquipment(formData: FormData) {
     purchase_date: strOrNull(formData, 'purchase_date'),
     purchase_price: numOrNull(formData, 'purchase_price'),
     next_service_date: strOrNull(formData, 'next_service_date'),
+    service_interval_months: numOrNull(formData, 'service_interval_months'),
     notes: strOrNull(formData, 'notes'),
   })
 
@@ -64,6 +66,7 @@ export async function updateEquipment(formData: FormData) {
       purchase_date: strOrNull(formData, 'purchase_date'),
       purchase_price: numOrNull(formData, 'purchase_price'),
       next_service_date: strOrNull(formData, 'next_service_date'),
+      service_interval_months: numOrNull(formData, 'service_interval_months'),
       notes: strOrNull(formData, 'notes'),
       updated_at: new Date().toISOString(),
     })
@@ -148,6 +151,54 @@ export async function deleteLoan(formData: FormData) {
   const id = String(formData.get('id') ?? '')
   const equipmentId = String(formData.get('equipment_id') ?? '')
   await supabase.from('equipment_loans').delete().eq('id', id)
+  revalidatePath('/equipment')
+  if (equipmentId) revalidatePath(`/equipment/${equipmentId}`)
+}
+
+export async function addEquipmentService(formData: FormData) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return
+
+  const equipmentId = String(formData.get('equipment_id') ?? '')
+  if (!equipmentId) return
+
+  const serviceDate = strOrNull(formData, 'service_date') ?? new Date().toISOString().slice(0, 10)
+  const intervalRaw = formData.get('service_interval_months')
+  const interval = intervalRaw !== null && intervalRaw !== '' ? Number(intervalRaw) : null
+  const nextServiceDate = interval && Number.isFinite(interval) ? addMonths(serviceDate, interval) : null
+
+  await supabase.from('equipment_services').insert({
+    owner_id: user.id,
+    equipment_id: equipmentId,
+    service_date: serviceDate,
+    service_type: String(formData.get('service_type') ?? 'rutin'),
+    cost: numOrNull(formData, 'cost') ?? 0,
+    vendor: strOrNull(formData, 'vendor'),
+    notes: strOrNull(formData, 'notes'),
+    next_service_date: nextServiceDate,
+  })
+
+  await supabase
+    .from('equipment')
+    .update({
+      next_service_date: nextServiceDate,
+      service_interval_months: interval ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', equipmentId)
+
+  revalidatePath('/equipment')
+  revalidatePath(`/equipment/${equipmentId}`)
+}
+
+export async function deleteEquipmentService(formData: FormData) {
+  const supabase = await createClient()
+  const id = String(formData.get('id') ?? '')
+  const equipmentId = String(formData.get('equipment_id') ?? '')
+  await supabase.from('equipment_services').delete().eq('id', id)
   revalidatePath('/equipment')
   if (equipmentId) revalidatePath(`/equipment/${equipmentId}`)
 }

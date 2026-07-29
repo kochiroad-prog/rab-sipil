@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { Equipment } from '@/types/database'
 import { deleteEquipment } from '@/app/(dashboard)/equipment/actions'
+import { computeServiceStatus, SERVICE_STATUS_BADGE, SERVICE_STATUS_LABEL } from '@/lib/equipment-service-status'
 
 const CATEGORY_LABEL: Record<string, string> = {
   alat_berat: 'Alat Berat',
@@ -39,17 +40,37 @@ export default function EquipmentBrowser({
   activeLoans: Record<string, ActiveLoanInfo>
 }) {
   const [query, setQuery] = useState('')
+  const [onlyNeedsService, setOnlyNeedsService] = useState(false)
+
+  const withStatus = useMemo(
+    () => equipment.map((e) => ({ e, service: computeServiceStatus(e.next_service_date) })),
+    [equipment]
+  )
+
+  const summary = useMemo(() => {
+    const terlambat = withStatus.filter((x) => x.service.status === 'terlambat').length
+    const segera = withStatus.filter((x) => x.service.status === 'segera').length
+    return { terlambat, segera }
+  }, [withStatus])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return equipment
-    return equipment.filter((e) =>
-      `${e.code ?? ''} ${e.name} ${e.brand ?? ''} ${e.model ?? ''}`.toLowerCase().includes(q)
-    )
-  }, [equipment, query])
+    return withStatus.filter(({ e, service }) => {
+      const matchQuery = !q || `${e.code ?? ''} ${e.name} ${e.brand ?? ''} ${e.model ?? ''}`.toLowerCase().includes(q)
+      const matchService = !onlyNeedsService || service.status === 'terlambat' || service.status === 'segera'
+      return matchQuery && matchService
+    })
+  }, [withStatus, query, onlyNeedsService])
 
   return (
     <>
+      {(summary.terlambat > 0 || summary.segera > 0) && (
+        <p className="mb-2 text-xs text-amber-700">
+          {summary.terlambat > 0 && `${summary.terlambat} alat terlambat servis`}
+          {summary.terlambat > 0 && summary.segera > 0 && ' · '}
+          {summary.segera > 0 && `${summary.segera} alat segera servis`}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <input
           value={query}
@@ -57,6 +78,10 @@ export default function EquipmentBrowser({
           placeholder="Cari nama, kode, atau merek..."
           className="w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
+        <label className="flex items-center gap-1.5 text-xs text-slate-600">
+          <input type="checkbox" checked={onlyNeedsService} onChange={(e) => setOnlyNeedsService(e.target.checked)} />
+          Perlu Servis
+        </label>
         <span className="text-xs text-slate-400">{filtered.length} dari {equipment.length} alat</span>
       </div>
 
@@ -67,6 +92,7 @@ export default function EquipmentBrowser({
               <th className="px-4 py-3 font-medium">Kategori</th>
               <th className="px-4 py-3 font-medium">Alat</th>
               <th className="px-4 py-3 font-medium">Kondisi</th>
+              <th className="px-4 py-3 font-medium">Servis</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3"></th>
             </tr>
@@ -74,12 +100,12 @@ export default function EquipmentBrowser({
           <tbody className="divide-y divide-slate-100">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
                   {equipment.length === 0 ? 'Belum ada alat.' : 'Tidak ada yang cocok.'}
                 </td>
               </tr>
             )}
-            {filtered.map((e) => {
+            {filtered.map(({ e, service }) => {
               const loan = activeLoans[e.id]
               return (
                 <tr key={e.id}>
@@ -96,6 +122,12 @@ export default function EquipmentBrowser({
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-xs ${CONDITION_BADGE[e.condition] ?? 'bg-slate-100 text-slate-600'}`}>
                       {CONDITION_LABEL[e.condition] ?? e.condition}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${SERVICE_STATUS_BADGE[service.status]}`}>
+                      {SERVICE_STATUS_LABEL[service.status]}
+                      {service.status === 'terlambat' && service.daysDiff !== null ? ` (${Math.abs(service.daysDiff)} hari)` : ''}
                     </span>
                   </td>
                   <td className="px-4 py-3">
