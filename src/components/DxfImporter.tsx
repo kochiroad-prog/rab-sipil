@@ -11,6 +11,7 @@ function formatRupiah(n: number) {
 }
 
 type Basis = 'panjang' | 'luas'
+type GroupMode = 'layer' | 'group'
 
 type LayerRow = DxfLayerSummary & {
   include: boolean
@@ -18,6 +19,7 @@ type LayerRow = DxfLayerSummary & {
   ahsp_item_id: string | null
   unit_price: number
   tkdn_percent: number
+  volumeOverride: number | null
 }
 
 type ProjectOpt = { id: string; name: string }
@@ -39,41 +41,60 @@ export default function DxfImporter({
   const [fileName, setFileName] = useState('')
   const [unit, setUnit] = useState<DxfUnitInfo | null>(null)
   const [manualScale, setManualScale] = useState('')
-  const [rows, setRows] = useState<LayerRow[]>([])
+  const [layerRows, setLayerRows] = useState<LayerRow[]>([])
+  const [groupRows, setGroupRows] = useState<LayerRow[]>([])
+  const [groupMode, setGroupMode] = useState<GroupMode>('layer')
+  const [meta, setMeta] = useState<{ blockCount: number; nestedEntityCount: number; entityCount: number } | null>(null)
   const [section, setSection] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const rows = groupMode === 'layer' ? layerRows : groupRows
+  const setRows = groupMode === 'layer' ? setLayerRows : setGroupRows
+
   const estimatedTotal = useMemo(
     () =>
       rows
         .filter((r) => r.include)
-        .reduce((sum, r) => sum + (r.basis === 'luas' ? r.totalAreaM2 : r.totalLengthM) * r.unit_price, 0),
+        .reduce((sum, r) => {
+          const vol = r.volumeOverride ?? (r.basis === 'luas' ? r.totalAreaM2 : r.totalLengthM)
+          return sum + vol * r.unit_price
+        }, 0),
     [rows]
   )
+
+  function toRows(list: DxfLayerSummary[]): LayerRow[] {
+    return list.map((l) => ({
+      ...l,
+      include: true,
+      basis: l.totalAreaM2 > 0 ? 'luas' : 'panjang',
+      ahsp_item_id: null,
+      unit_price: 0,
+      tkdn_percent: 0,
+      volumeOverride: null,
+    }))
+  }
 
   function runParse(text: string, scaleOverride?: number) {
     try {
       const result = computeDxfTakeoff(text, scaleOverride)
       setUnit(result.unit)
-      setRows(
-        result.layers.map((l) => ({
-          ...l,
-          include: true,
-          basis: l.totalAreaM2 > 0 ? 'luas' : 'panjang',
-          ahsp_item_id: null,
-          unit_price: 0,
-          tkdn_percent: 0,
-        }))
-      )
+      setMeta({ blockCount: result.blockCount, nestedEntityCount: result.nestedEntityCount, entityCount: result.entityCount })
+      setLayerRows(toRows(result.layers))
+      setGroupRows(toRows(result.groups))
+      // Kalau layer nggak informatif (cuma 1, biasanya "0" — umum di file dari SketchUp),
+      // langsung default ke pengelompokan per grup/block supaya user tidak cuma lihat 1 baris.
+      setGroupMode(result.layers.length <= 1 && result.groups.length > 1 ? 'group' : 'layer')
       setError(null)
       if (result.layers.length === 0) {
-        setError('Tidak ada garis/polyline yang terbaca dari file ini (cek isinya, atau format bukan DXF ASCII).')
+        setError('Tidak ada garis/polyline/circle yang terbaca dari file ini (cek isinya, atau format bukan DXF ASCII).')
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal membaca file DXF')
-      setRows([])
+      setLayerRows([])
+      setGroupRows([])
+      setMeta(null)
     }
   }
 
@@ -110,7 +131,9 @@ export default function DxfImporter({
     setFileName('')
     setUnit(null)
     setManualScale('')
-    setRows([])
+    setLayerRows([])
+    setGroupRows([])
+    setMeta(null)
     setError(null)
     if (fileRef.current) fileRef.current.value = ''
   }
@@ -125,13 +148,13 @@ export default function DxfImporter({
       .map((r) => ({
         name: r.layer,
         unit: r.basis === 'luas' ? 'm2' : 'm1',
-        volume: r.basis === 'luas' ? r.totalAreaM2 : r.totalLengthM,
+        volume: r.volumeOverride ?? (r.basis === 'luas' ? r.totalAreaM2 : r.totalLengthM),
         ahsp_item_id: r.ahsp_item_id,
         unit_price: r.unit_price,
         tkdn_percent: r.tkdn_percent,
       }))
     if (chosen.length === 0) {
-      setError('Tidak ada layer yang dicentang untuk disimpan.')
+      setError(`Tidak ada ${groupMode === 'layer' ? 'layer' : 'grup'} yang dicentang untuk disimpan.`)
       return
     }
     setLoading(true)
@@ -141,11 +164,13 @@ export default function DxfImporter({
       setError(saveError)
       return
     }
-    setSaveMsg(`${chosen.length} item (dari layer DXF) ditambahkan ke Rincian RAB.`)
+    setSaveMsg(`${chosen.length} item (dari DXF) ditambahkan ke Rincian RAB.`)
     setRawText('')
     setFileName('')
     setUnit(null)
-    setRows([])
+    setLayerRows([])
+    setGroupRows([])
+    setMeta(null)
   }
 
   return (
@@ -209,6 +234,13 @@ export default function DxfImporter({
           </p>
         )}
 
+        {meta && meta.nestedEntityCount > 0 && (
+          <p className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            {meta.entityCount} garis/bentuk terbaca, termasuk {meta.nestedEntityCount} yang tadinya tersembunyi di
+            dalam {meta.blockCount} grup/block (mis. hasil ekspor SketchUp) — sekarang sudah ikut dihitung.
+          </p>
+        )}
+
         {rawText && (
           <div className="flex flex-wrap items-center gap-2">
             <label className="text-xs text-slate-500">
@@ -231,23 +263,50 @@ export default function DxfImporter({
         )}
       </div>
 
-      {rows.length > 0 && (
+      {(layerRows.length > 0 || groupRows.length > 0) && (
         <div className="mt-4 space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-slate-600">Kategori di RAB</label>
-            <input
-              value={section}
-              onChange={(e) => setSection(e.target.value)}
-              className="mt-1 w-full max-w-sm rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600">Kategori di RAB</label>
+              <input
+                value={section}
+                onChange={(e) => setSection(e.target.value)}
+                className="mt-1 w-full max-w-sm rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600">Kelompokkan berdasarkan</label>
+              <div className="mt-1 flex overflow-hidden rounded-md border border-slate-300 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setGroupMode('layer')}
+                  className={`px-3 py-1.5 ${groupMode === 'layer' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                >
+                  Layer ({layerRows.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGroupMode('group')}
+                  className={`border-l border-slate-300 px-3 py-1.5 ${groupMode === 'group' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                >
+                  Nama Grup/Block ({groupRows.length})
+                </button>
+              </div>
+            </div>
           </div>
+          {groupMode === 'layer' && layerRows.length <= 1 && (
+            <p className="text-xs text-amber-600">
+              Semua garis ada di 1 layer saja (umum kalau file diekspor dari SketchUp) — coba mode &quot;Nama
+              Grup/Block&quot; supaya bisa dipilah lebih dari 1 baris.
+            </p>
+          )}
 
           <div className="overflow-x-auto rounded-md border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-left text-slate-500">
                 <tr>
                   <th className="px-3 py-2"></th>
-                  <th className="px-3 py-2 font-medium">Layer</th>
+                  <th className="px-3 py-2 font-medium">{groupMode === 'layer' ? 'Layer' : 'Grup/Block'}</th>
                   <th className="px-3 py-2 font-medium">Basis</th>
                   <th className="px-3 py-2 text-right font-medium">Volume</th>
                   <th className="px-3 py-2 font-medium">Referensi AHSP</th>
@@ -257,7 +316,8 @@ export default function DxfImporter({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {rows.map((r) => {
-                  const volume = r.basis === 'luas' ? r.totalAreaM2 : r.totalLengthM
+                  const computedVolume = r.basis === 'luas' ? r.totalAreaM2 : r.totalLengthM
+                  const volume = r.volumeOverride ?? computedVolume
                   return (
                     <tr key={r.layer}>
                       <td className="px-3 py-2 align-top">
@@ -271,14 +331,34 @@ export default function DxfImporter({
                       <td className="px-3 py-2 align-top">
                         <select
                           value={r.basis}
-                          onChange={(e) => updateRow(r.layer, { basis: e.target.value as Basis })}
+                          onChange={(e) => updateRow(r.layer, { basis: e.target.value as Basis, volumeOverride: null })}
                           className="rounded border border-slate-200 px-2 py-1 text-xs"
                         >
                           <option value="panjang" disabled={r.totalLengthM <= 0}>Panjang (m1)</option>
                           <option value="luas" disabled={r.totalAreaM2 <= 0}>Luas (m2)</option>
                         </select>
                       </td>
-                      <td className="px-3 py-2 text-right align-top text-slate-700">{volume.toFixed(2)}</td>
+                      <td className="px-3 py-2 align-top">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={volume}
+                          onChange={(e) => updateRow(r.layer, { volumeOverride: Number(e.target.value) })}
+                          className={`w-28 rounded border px-2 py-1 text-right text-sm ${
+                            r.volumeOverride !== null ? 'border-amber-400 bg-amber-50' : 'border-slate-200'
+                          }`}
+                        />
+                        {r.volumeOverride !== null && (
+                          <button
+                            type="button"
+                            onClick={() => updateRow(r.layer, { volumeOverride: null })}
+                            className="ml-1 text-[10px] text-slate-400 hover:underline"
+                            title={`Kembalikan ke hasil hitung otomatis (${computedVolume.toFixed(2)})`}
+                          >
+                            reset
+                          </button>
+                        )}
+                      </td>
                       <td className="px-3 py-2 align-top">
                         <AhspCombobox
                           items={ahspItems}
