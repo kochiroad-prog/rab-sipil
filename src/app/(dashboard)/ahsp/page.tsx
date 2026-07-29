@@ -1,11 +1,8 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import type { AhspItem, AhspCategory } from '@/types/database'
-import { addAhspItem, deleteAhspItem } from './actions'
-
-function formatRupiah(n: number) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
-}
+import AhspBrowser from '@/components/AhspBrowser'
+import { addAhspItem } from './actions'
 
 const BIDANG_LABEL: Record<string, string> = {
   bina_marga: 'Bina Marga',
@@ -92,50 +89,7 @@ export default async function AhspPage({
         </form>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
-            <tr>
-              <th className="px-4 py-3 font-medium">Kode</th>
-              <th className="px-4 py-3 font-medium">Kategori</th>
-              <th className="px-4 py-3 font-medium">Nama Pekerjaan</th>
-              <th className="px-4 py-3 font-medium">Satuan</th>
-              <th className="px-4 py-3 text-right font-medium">Harga Satuan</th>
-              <th className="px-4 py-3 text-right font-medium">TKDN</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {items.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-slate-500">Belum ada data AHSP.</td>
-              </tr>
-            )}
-            {items.map((it) => (
-              <tr key={it.id}>
-                <td className="px-4 py-3 text-slate-500">{it.code ?? '-'}</td>
-                <td className="px-4 py-3 text-slate-600">{it.ahsp_categories?.name ?? '-'}</td>
-                <td className="px-4 py-3">
-                  <Link href={`/ahsp/${it.id}`} className="text-slate-900 underline">
-                    {it.name}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-slate-600">{it.unit}</td>
-                <td className="px-4 py-3 text-right text-slate-600">{formatRupiah(it.unit_price)}</td>
-                <td className="px-4 py-3 text-right text-slate-600">{it.tkdn_percent > 0 ? `${it.tkdn_percent}%` : '-'}</td>
-                <td className="px-4 py-3 text-right">
-                  {it.owner_id === user?.id && (
-                    <form action={deleteAhspItem}>
-                      <input type="hidden" name="id" value={it.id} />
-                      <button className="text-xs text-red-600 hover:underline">Hapus</button>
-                    </form>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <AhspBrowser items={items} userId={user?.id} />
     </div>
   )
 }

@@ -1,12 +1,14 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import type { Project, RabItem, AhspItem, AhspCategory } from '@/types/database'
+import type { Project, RabItem } from '@/types/database'
 import AiAssist from '@/components/AiAssist'
 import VisionEstimator from '@/components/VisionEstimator'
 import RabItemPriceEditor from '@/components/RabItemPriceEditor'
 import ProjectSettings from '@/components/ProjectSettings'
-import { addRabItem, deleteRabItem, deleteProject } from '../actions'
+import AddRabItemForm from '@/components/AddRabItemForm'
+import type { AhspOption } from '@/components/AhspCombobox'
+import { deleteRabItem, deleteProject } from '../actions'
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
@@ -36,11 +38,23 @@ export default async function ProjectDetailPage({
     .order('created_at', { ascending: true })
     .returns<RabItem[]>()
 
-  const { data: ahspItems } = await supabase
+  const { data: ahspItemsRaw } = await supabase
     .from('ahsp_items')
-    .select('*, ahsp_categories(name)')
+    .select('id, code, name, unit, unit_price, tkdn_percent, ahsp_categories(name)')
     .order('name', { ascending: true })
-    .returns<(AhspItem & { ahsp_categories: AhspCategory | null })[]>()
+    .returns<
+      { id: string; code: string | null; name: string; unit: string; unit_price: number; tkdn_percent: number; ahsp_categories: { name: string } | null }[]
+    >()
+
+  const ahspItems: AhspOption[] = (ahspItemsRaw ?? []).map((a) => ({
+    id: a.id,
+    code: a.code,
+    name: a.name,
+    unit: a.unit,
+    unit_price: a.unit_price,
+    tkdn_percent: a.tkdn_percent,
+    category_name: a.ahsp_categories?.name ?? null,
+  }))
 
   const rabItems = items ?? []
   const subtotal = rabItems.reduce((sum, it) => sum + it.volume * it.unit_price, 0)
@@ -103,74 +117,7 @@ export default async function ProjectDetailPage({
 
       <AiAssist />
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
-        <h3 className="font-medium text-slate-900">Tambah Item Manual</h3>
-        <form action={addRabItem} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-6">
-          <input type="hidden" name="project_id" value={project.id} />
-          <input
-            name="section"
-            placeholder="Kategori (opsional)"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-1"
-          />
-          <select
-            name="ahsp_item_id"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
-            defaultValue=""
-          >
-            <option value="">-- Referensi AHSP (opsional) --</option>
-            {(ahspItems ?? []).map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.ahsp_categories?.name ? `[${a.ahsp_categories.name}] ` : ''}
-                {a.name} ({a.unit}) - {formatRupiah(a.unit_price)}
-              </option>
-            ))}
-          </select>
-          <input
-            name="name"
-            required
-            placeholder="Nama pekerjaan"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-1"
-          />
-          <input
-            name="unit"
-            required
-            placeholder="Satuan"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-1"
-          />
-          <input
-            name="volume"
-            type="number"
-            step="0.01"
-            required
-            placeholder="Volume"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-1"
-          />
-          <input
-            name="unit_price"
-            type="number"
-            step="1"
-            required
-            placeholder="Harga satuan"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-1"
-          />
-          <input
-            name="tkdn_percent"
-            type="number"
-            step="0.1"
-            min={0}
-            max={100}
-            placeholder="TKDN % (opsional)"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-1"
-          />
-          <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:col-span-1">
-            Tambah
-          </button>
-        </form>
-        <p className="mt-2 text-xs text-slate-400">
-          Pilih referensi AHSP untuk mengisi nama &amp; TKDN otomatis (kalau TKDN dikosongkan) — harga tetap perlu diisi.
-          Klik nilai harga di tabel untuk edit belakangan.
-        </p>
-      </div>
+      <AddRabItemForm projectId={project.id} ahspItems={ahspItems} />
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-sm">
