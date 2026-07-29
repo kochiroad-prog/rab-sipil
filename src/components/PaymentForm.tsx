@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { payPurchaseOrders } from '@/app/(dashboard)/purchasing/actions'
 import type { PurchaseOrder } from '@/types/database'
+import PhotoUploadInput from '@/components/PhotoUploadInput'
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
@@ -12,19 +13,10 @@ export default function PaymentForm({ supplierName, pos }: { supplierName: strin
   const [selected, setSelected] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(pos.map((p) => [p.id, true]))
   )
-  const [proofDataUrl, setProofDataUrl] = useState('')
   const [note, setNote] = useState('')
 
   const checkedPos = useMemo(() => pos.filter((p) => selected[p.id]), [pos, selected])
   const total = checkedPos.reduce((s, p) => s + p.total_amount, 0)
-
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => setProofDataUrl(String(reader.result))
-    reader.readAsDataURL(file)
-  }
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -54,9 +46,8 @@ export default function PaymentForm({ supplierName, pos }: { supplierName: strin
         ))}
         <input type="hidden" name="supplier_name" value={supplierName} />
         <input type="hidden" name="total_amount" value={total} />
-        <input type="hidden" name="proof_url" value={proofDataUrl} />
+        <PhotoUploadInput name="proof_url" bucket="payment-proofs" accept="image/*,.pdf" label="Bukti Transfer" />
         <div className="flex flex-wrap items-center gap-2">
-          <input type="file" accept="image/*,.pdf" onChange={handleFile} className="text-xs" />
           <input
             name="note"
             value={note}
@@ -72,7 +63,6 @@ export default function PaymentForm({ supplierName, pos }: { supplierName: strin
             Bayar {formatRupiah(total)}
           </button>
         </div>
-        {proofDataUrl && <p className="text-xs text-emerald-700">Bukti transfer terlampir.</p>}
       </form>
     </div>
   )

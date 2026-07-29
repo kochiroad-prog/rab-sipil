@@ -1,12 +1,14 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
+import { uploadToBucket } from '@/lib/upload-client'
 
 export default function SignaturePad({ name }: { name: string }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const drawing = useRef(false)
   const [empty, setEmpty] = useState(true)
   const [dataUrl, setDataUrl] = useState('')
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -50,7 +52,19 @@ export default function SignaturePad({ name }: { name: string }) {
     if (!drawing.current) return
     drawing.current = false
     const canvas = canvasRef.current
-    if (canvas) setDataUrl(canvas.toDataURL('image/png'))
+    if (!canvas) return
+    setUploading(true)
+    canvas.toBlob(async (blob) => {
+      if (!blob) { setUploading(false); return }
+      try {
+        const url = await uploadToBucket('signatures', blob, 'png')
+        setDataUrl(url)
+      } catch {
+        // gagal upload — tanda tangan tetap kosong, user bisa coba lagi (hapus & ulang)
+      } finally {
+        setUploading(false)
+      }
+    }, 'image/png')
   }
 
   function clear() {
@@ -80,7 +94,9 @@ export default function SignaturePad({ name }: { name: string }) {
         <button type="button" onClick={clear} className="text-xs text-slate-500 hover:underline">
           Hapus tanda tangan
         </button>
-        <span className="text-xs text-slate-400">{empty ? 'Belum ada tanda tangan' : 'Tersimpan'}</span>
+        <span className="text-xs text-slate-400">
+          {empty ? 'Belum ada tanda tangan' : uploading ? 'Mengupload...' : dataUrl ? 'Tersimpan' : 'Gagal upload, coba lagi'}
+        </span>
       </div>
       <input type="hidden" name={name} value={dataUrl} />
     </div>
