@@ -257,6 +257,50 @@ export type VolumeGenericEntry = {
   created_at: string
 }
 
+export type EquipmentCategory =
+  | 'alat_berat' | 'alat_tangan' | 'alat_ukur' | 'scaffolding' | 'genset' | 'alat_listrik' | 'lainnya'
+export type EquipmentCondition = 'baik' | 'rusak_ringan' | 'rusak_berat' | 'perbaikan'
+
+export type Equipment = {
+  id: string
+  owner_id: string
+  code: string | null
+  category: EquipmentCategory
+  name: string
+  brand: string | null
+  model: string | null
+  serial_number: string | null
+  condition: EquipmentCondition
+  location: string | null
+  purchase_date: string | null
+  purchase_price: number | null
+  next_service_date: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type LoanStatus = 'dipinjam' | 'dikembalikan' | 'hilang' | 'rusak'
+
+export type EquipmentLoan = {
+  id: string
+  owner_id: string
+  equipment_id: string
+  project_id: string | null
+  borrower_name: string
+  borrower_role: string | null
+  loan_date: string
+  expected_return_date: string | null
+  actual_return_date: string | null
+  condition_out: string | null
+  condition_in: string | null
+  notes: string | null
+  signature_data_url: string | null
+  status: LoanStatus
+  created_at: string
+  updated_at: string
+}
+
 export type ElementType = 'kolom' | 'balok' | 'sloof' | 'plat'
 
 export type StructuralElement = {
