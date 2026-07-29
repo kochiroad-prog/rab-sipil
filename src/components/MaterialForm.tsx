@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { addMaterial } from '@/app/(dashboard)/materials/actions'
-import type { MaterialKind } from '@/types/database'
+import type { MaterialKind, Supplier } from '@/types/database'
 
 const CATEGORIES = [
   ['semen', 'Semen'],
@@ -27,7 +27,7 @@ const KIND_LABEL: Record<MaterialKind, string> = {
   bulk: 'Curah/satuan langsung — mis. semen sak, pasir m³',
 }
 
-export default function MaterialForm() {
+export default function MaterialForm({ suppliers = [] }: { suppliers?: Supplier[] }) {
   const [kind, setKind] = useState<MaterialKind>('bulk')
 
   return (
@@ -79,6 +79,12 @@ export default function MaterialForm() {
         <input name="brand" placeholder="Merek (opsional)" className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2" />
         <input name="specification" placeholder="Spesifikasi (opsional)" className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2" />
         <input name="aliases" placeholder="Alias, pisah koma (opsional)" className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2" />
+        <select name="supplier_id" defaultValue="" className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2">
+          <option value="">-- Supplier (opsional) --</option>
+          {suppliers.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}{s.city ? ` - ${s.city}` : ''}</option>
+          ))}
+        </select>
 
         <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:col-span-1">
           Tambah

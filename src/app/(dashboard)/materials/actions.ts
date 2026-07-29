@@ -43,6 +43,7 @@ export async function addMaterial(formData: FormData) {
     aliases,
     brand: String(formData.get('brand') ?? '').trim() || null,
     specification: String(formData.get('specification') ?? '').trim() || null,
+    supplier_id: String(formData.get('supplier_id') ?? '').trim() || null,
   })
 
   revalidatePath('/materials')

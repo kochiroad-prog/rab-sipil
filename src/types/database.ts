@@ -78,6 +78,19 @@ export type Material = {
   brand: string | null
   specification: string | null
   tkdn_percent: number
+  supplier_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type Supplier = {
+  id: string
+  owner_id: string
+  name: string
+  city: string | null
+  phone: string | null
+  maps_link: string | null
+  notes: string | null
   created_at: string
   updated_at: string
 }

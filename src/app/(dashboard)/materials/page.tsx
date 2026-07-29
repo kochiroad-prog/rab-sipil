@@ -1,12 +1,8 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import type { Material } from '@/types/database'
+import type { Material, Supplier } from '@/types/database'
 import MaterialForm from '@/components/MaterialForm'
-import { deleteMaterial } from './actions'
-
-function formatRupiah(n: number) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
-}
+import MaterialsBrowser from '@/components/MaterialsBrowser'
 
 const CATEGORY_LABEL: Record<string, string> = {
   semen: 'Semen',
@@ -34,9 +30,12 @@ export default async function MaterialsPage({
     data: { user },
   } = await supabase.auth.getUser()
 
-  let query = supabase.from('materials').select('*').order('name')
+  let query = supabase.from('materials').select('*, suppliers(name)').order('name')
   if (category) query = query.eq('category', category)
-  const { data: materials } = await query.returns<Material[]>()
+  const { data: materialsRaw } = await query.returns<(Material & { suppliers: { name: string } | null })[]>()
+  const materials = materialsRaw ?? []
+
+  const { data: suppliers } = await supabase.from('suppliers').select('*').order('name').returns<Supplier[]>()
 
   return (
     <div className="space-y-6">
@@ -65,49 +64,9 @@ export default async function MaterialsPage({
         ))}
       </div>
 
-      <MaterialForm />
+      <MaterialForm suppliers={suppliers ?? []} />
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
-            <tr>
-              <th className="px-4 py-3 font-medium">Kategori</th>
-              <th className="px-4 py-3 font-medium">Nama</th>
-              <th className="px-4 py-3 font-medium">Satuan</th>
-              <th className="px-4 py-3 text-right font-medium">Harga</th>
-              <th className="px-4 py-3 text-right font-medium">Waste</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {(materials ?? []).length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-slate-500">Belum ada material.</td>
-              </tr>
-            )}
-            {(materials ?? []).map((m) => (
-              <tr key={m.id}>
-                <td className="px-4 py-3 text-slate-500">{CATEGORY_LABEL[m.category] ?? m.category}</td>
-                <td className="px-4 py-3 text-slate-900">
-                  {m.name}
-                  {m.brand ? <span className="ml-1 text-xs text-slate-400">({m.brand})</span> : null}
-                </td>
-                <td className="px-4 py-3 text-slate-600">{m.unit}</td>
-                <td className="px-4 py-3 text-right text-slate-600">{formatRupiah(m.price)}</td>
-                <td className="px-4 py-3 text-right text-slate-600">{m.waste_pct}%</td>
-                <td className="px-4 py-3 text-right">
-                  {m.owner_id === user?.id && (
-                    <form action={deleteMaterial}>
-                      <input type="hidden" name="id" value={m.id} />
-                      <button className="text-xs text-red-600 hover:underline">Hapus</button>
-                    </form>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <MaterialsBrowser materials={materials} userId={user?.id} />
     </div>
   )
 }
