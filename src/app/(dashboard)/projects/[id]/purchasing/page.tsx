@@ -1,9 +1,28 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import type { Project, RabItem, AhspComponent, Material } from '@/types/database'
+import type { Project, RabItem, AhspComponent, Material, PurchaseOrder } from '@/types/database'
 import { aggregateMaterials } from '@/lib/takeoff-sipil'
 import PurchasingTable from '@/components/PurchasingTable'
+import BuatPOPanel from '@/components/BuatPOPanel'
+
+function formatRupiah(n: number) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
+}
+
+const PO_STATUS_LABEL: Record<string, string> = {
+  ordered: 'Dipesan',
+  invoiced: 'Invoiced',
+  paid: 'Lunas',
+  cancelled: 'Dibatalkan',
+}
+
+const PO_STATUS_BADGE: Record<string, string> = {
+  ordered: 'bg-slate-100 text-slate-600',
+  invoiced: 'bg-blue-50 text-blue-700',
+  paid: 'bg-emerald-50 text-emerald-700',
+  cancelled: 'bg-red-50 text-red-700',
+}
 
 export default async function PurchasingPage({
   params,
@@ -43,10 +62,31 @@ export default async function PurchasingPage({
     }
   }
 
-  const { data: materials } = await supabase.from('materials').select('*').returns<Material[]>()
+  const { data: materialsRaw } = await supabase
+    .from('materials')
+    .select('*, suppliers(id, name)')
+    .returns<(Material & { suppliers: { id: string; name: string } | null })[]>()
+  const materials = materialsRaw ?? []
 
-  const rows = aggregateMaterials(rabItems ?? [], componentsByAhspItem, materials ?? [])
+  const supplierByMaterialId: Record<string, { id: string | null; name: string }> = {}
+  for (const m of materials) {
+    if (m.suppliers) supplierByMaterialId[m.id] = { id: m.suppliers.id, name: m.suppliers.name }
+  }
+
+  const rows = aggregateMaterials(rabItems ?? [], componentsByAhspItem, materials)
   const unmatchedCount = rows.filter((r) => !r.matched).length
+
+  const { data: posRaw } = await supabase
+    .from('purchase_orders')
+    .select('*')
+    .eq('project_id', id)
+    .order('created_at', { ascending: false })
+    .returns<PurchaseOrder[]>()
+  const purchaseOrders = posRaw ?? []
+
+  const totalBelanja = purchaseOrders.filter((p) => p.status !== 'cancelled').reduce((s, p) => s + p.total_amount, 0)
+  const totalDibayar = purchaseOrders.filter((p) => p.status === 'paid').reduce((s, p) => s + p.total_amount, 0)
+  const sisaBelanja = totalBelanja - totalDibayar
 
   return (
     <div className="space-y-6">
@@ -85,7 +125,56 @@ export default async function PurchasingPage({
             </p>
           )}
           <PurchasingTable rows={rows} />
+
+          <BuatPOPanel projectId={id} rows={rows} supplierByMaterialId={supplierByMaterialId} />
         </>
+      )}
+
+      {purchaseOrders.length > 0 && (
+        <div>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-medium text-slate-900">PO &amp; Invoice</h3>
+            <p className="text-xs text-slate-500">
+              Total Belanja {formatRupiah(totalBelanja)} · Dibayar {formatRupiah(totalDibayar)} · Sisa {formatRupiah(sisaBelanja)}
+            </p>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-left text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 font-medium">No. PO</th>
+                  <th className="px-4 py-3 font-medium">Supplier</th>
+                  <th className="px-4 py-3 text-right font-medium">Nilai</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {purchaseOrders.map((po) => (
+                  <tr key={po.id}>
+                    <td className="px-4 py-3 text-slate-900">
+                      <Link href={`/projects/${id}/purchasing/po/${po.id}`} className="hover:underline">
+                        {po.po_number}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{po.supplier_name ?? '-'}</td>
+                    <td className="px-4 py-3 text-right text-slate-600">{formatRupiah(po.total_amount)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-full px-2 py-0.5 text-xs ${PO_STATUS_BADGE[po.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                        {PO_STATUS_LABEL[po.status] ?? po.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link href={`/projects/${id}/purchasing/po/${po.id}`} className="text-xs text-blue-700 hover:underline">
+                        Detail
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </div>
   )

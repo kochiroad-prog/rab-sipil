@@ -347,6 +347,52 @@ export type Quotation = {
   updated_at: string
 }
 
+export type PurchaseOrderStatus = 'ordered' | 'invoiced' | 'paid' | 'cancelled'
+
+export type PurchaseOrder = {
+  id: string
+  owner_id: string
+  project_id: string
+  supplier_id: string | null
+  supplier_name: string | null
+  po_number: string | null
+  po_date: string
+  status: PurchaseOrderStatus
+  invoice_number: string | null
+  invoice_amount: number | null
+  invoice_url: string | null
+  invoice_date: string | null
+  total_amount: number
+  retensi_pct: number
+  payment_id: string | null
+  note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type PurchaseOrderItem = {
+  id: string
+  po_id: string
+  material_name: string
+  qty: number
+  unit: string
+  unit_price: number
+  total: number
+  sort: number
+}
+
+export type PurchasePayment = {
+  id: string
+  owner_id: string
+  supplier_name: string | null
+  total_amount: number
+  proof_url: string | null
+  note: string | null
+  po_ids: string[]
+  paid_at: string
+  created_at: string
+}
+
 export type ElementType = 'kolom' | 'balok' | 'sloof' | 'plat'
 
 export type StructuralElement = {
