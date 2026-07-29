@@ -199,6 +199,49 @@ export type ManpowerPlan = {
   created_at: string
 }
 
+export type FormulaType = 'pxlxt' | 'pxl' | 'keliling' | 'trapesium' | 'custom'
+
+export type VolumeRecipe = {
+  id: string
+  owner_id: string | null
+  name: string
+  formula_type: FormulaType
+  description: string | null
+  sort_order: number
+  created_at: string
+}
+
+export type VolumeRecipeItem = {
+  id: string
+  recipe_id: string
+  name: string
+  unit: string
+  coefficient: number
+  ahsp_item_id: string | null
+  sort_order: number
+  created_at: string
+}
+
+export type VolumeGenericEntry = {
+  id: string
+  project_id: string
+  recipe_id: string | null
+  recipe_name: string
+  formula_type: FormulaType
+  name: string
+  section: string | null
+  quantity: number
+  panjang_m: number
+  lebar_m: number
+  lebar_atas_m: number
+  lebar_bawah_m: number
+  tinggi_m: number
+  custom_volume: number
+  base_volume: number
+  sort_order: number
+  created_at: string
+}
+
 export type ElementType = 'kolom' | 'balok' | 'sloof' | 'plat'
 
 export type StructuralElement = {

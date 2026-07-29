@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { calcElement, type ElementDimensions } from '@/lib/volume-calc'
-import type { ElementType } from '@/types/database'
+import { calcBaseTotal, type GenericDimensions } from '@/lib/volume-generic-calc'
+import type { ElementType, FormulaType } from '@/types/database'
 
 function numberOf(formData: FormData, key: string) {
   const v = Number(formData.get(key) ?? 0)
@@ -124,6 +125,105 @@ export async function sendElementToRab(formData: FormData) {
   if (rows.length > 0) {
     await supabase.from('rab_items').insert(rows)
   }
+
+  revalidatePath(`/projects/${project_id}`)
+  revalidatePath(`/projects/${project_id}/volume`)
+}
+
+// ============================================================
+// Fase D: Resep Volume Generik (formula pxlxt/pxl/keliling/trapesium/custom)
+// ============================================================
+
+export async function addVolumeGenericEntry(formData: FormData) {
+  const supabase = await createClient()
+  const project_id = String(formData.get('project_id') ?? '')
+  const recipe_id = String(formData.get('recipe_id') ?? '') || null
+  const recipe_name = String(formData.get('recipe_name') ?? '').trim()
+  const formula_type = String(formData.get('formula_type') ?? '') as FormulaType
+  const name = String(formData.get('name') ?? '').trim()
+  const section = String(formData.get('section') ?? '').trim() || null
+
+  if (!project_id || !recipe_name || !formula_type || !name) return
+
+  const dims: GenericDimensions = {
+    formula_type,
+    quantity: numberOf(formData, 'quantity') || 1,
+    panjang_m: numberOf(formData, 'panjang_m'),
+    lebar_m: numberOf(formData, 'lebar_m'),
+    lebar_atas_m: numberOf(formData, 'lebar_atas_m'),
+    lebar_bawah_m: numberOf(formData, 'lebar_bawah_m'),
+    tinggi_m: numberOf(formData, 'tinggi_m'),
+    custom_volume: numberOf(formData, 'custom_volume'),
+  }
+
+  const base_volume = calcBaseTotal(dims)
+
+  await supabase.from('volume_generic_entries').insert({
+    project_id,
+    recipe_id,
+    recipe_name,
+    formula_type,
+    name,
+    section,
+    quantity: dims.quantity,
+    panjang_m: dims.panjang_m,
+    lebar_m: dims.lebar_m,
+    lebar_atas_m: dims.lebar_atas_m,
+    lebar_bawah_m: dims.lebar_bawah_m,
+    tinggi_m: dims.tinggi_m,
+    custom_volume: dims.custom_volume,
+    base_volume,
+  })
+
+  revalidatePath(`/projects/${project_id}/volume`)
+}
+
+export async function deleteVolumeGenericEntry(formData: FormData) {
+  const supabase = await createClient()
+  const id = String(formData.get('id') ?? '')
+  const project_id = String(formData.get('project_id') ?? '')
+  await supabase.from('volume_generic_entries').delete().eq('id', id)
+  revalidatePath(`/projects/${project_id}/volume`)
+}
+
+// Kirim satu entry ke Rincian RAB sebagai beberapa baris (sesuai item resep x koefisien x base_volume).
+// Harga satuan diambil dari referensi AHSP item resep bila ada, selain itu 0 (diisi manual belakangan).
+export async function sendVolumeGenericEntryToRab(formData: FormData) {
+  const supabase = await createClient()
+  const project_id = String(formData.get('project_id') ?? '')
+  const entry_id = String(formData.get('entry_id') ?? '')
+
+  const { data: entry } = await supabase
+    .from('volume_generic_entries')
+    .select('*')
+    .eq('id', entry_id)
+    .single()
+
+  if (!entry) return
+
+  const { data: recipeItems } = await supabase
+    .from('volume_recipe_items')
+    .select('*, ahsp_items(name, unit, unit_price, tkdn_percent)')
+    .eq('recipe_id', entry.recipe_id ?? '')
+    .order('sort_order')
+
+  if (!recipeItems || recipeItems.length === 0) return
+
+  const rows = recipeItems.map((ri) => {
+    const ahsp = ri.ahsp_items as { name: string; unit: string; unit_price: number; tkdn_percent: number } | null
+    return {
+      project_id,
+      section: entry.section,
+      ahsp_item_id: ri.ahsp_item_id,
+      name: `${ri.name} - ${entry.name}`,
+      unit: ri.unit,
+      volume: Math.round(entry.base_volume * ri.coefficient * 10000) / 10000,
+      unit_price: ahsp?.unit_price ?? 0,
+      tkdn_percent: ahsp?.tkdn_percent ?? 0,
+    }
+  })
+
+  await supabase.from('rab_items').insert(rows)
 
   revalidatePath(`/projects/${project_id}`)
   revalidatePath(`/projects/${project_id}/volume`)

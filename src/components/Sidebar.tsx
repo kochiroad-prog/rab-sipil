@@ -10,6 +10,7 @@ import {
   Package,
   LayoutTemplate,
   Users,
+  Ruler,
   LogOut,
   Menu,
   X,
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { href: '/projects', label: 'Proyek', icon: Building2 },
   { href: '/ahsp', label: 'Database AHSP', icon: ListChecks },
   { href: '/materials', label: 'Material', icon: Package },
+  { href: '/volume-recipes', label: 'Resep Volume', icon: Ruler },
   { href: '/templates', label: 'Template', icon: LayoutTemplate },
   { href: '/labours', label: 'Tenaga Kerja', icon: Users },
 ]
