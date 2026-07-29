@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { insertDraftItems } from '@/app/(dashboard)/projects/actions'
 import AhspCombobox, { type AhspOption } from '@/components/AhspCombobox'
 import { uploadToBucket } from '@/lib/upload-client'
+import { pdfToImageBlobs, isPdfFile } from '@/lib/pdf-to-images'
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
@@ -94,7 +95,19 @@ export default function VisionEstimator({
       const urls: string[] = []
       for (const file of chosen) {
         try {
-          urls.push(await uploadToBucket('project-photos', file))
+          if (isPdfFile(file)) {
+            // PDF: render tiap halaman jadi gambar dulu di browser, baru upload per halaman.
+            const pageBlobs = await pdfToImageBlobs(file)
+            if (pageBlobs.length === 0) {
+              setError(`Gagal membaca halaman PDF "${file.name}".`)
+              continue
+            }
+            for (const blob of pageBlobs) {
+              urls.push(await uploadToBucket('project-photos', blob, 'png'))
+            }
+          } else {
+            urls.push(await uploadToBucket('project-photos', file))
+          }
         } catch (e) {
           setError('Upload gagal: ' + (e instanceof Error ? e.message : 'tidak diketahui'))
         }
@@ -275,13 +288,14 @@ export default function VisionEstimator({
           <div>
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,application/pdf"
               multiple
               onChange={(e) => handleFiles(e.target.files)}
               disabled={uploading}
               className="block text-sm"
             />
-            {uploading && <p className="mt-1 text-xs text-slate-400">Mengupload foto...</p>}
+            <p className="mt-1 text-[11px] text-slate-400">Bisa foto atau PDF gambar kerja (tiap halaman PDF otomatis jadi gambar).</p>
+            {uploading && <p className="mt-1 text-xs text-slate-400">Memproses &amp; mengupload...</p>}
             {images.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {images.map((u) => (
