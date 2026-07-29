@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import VisionEstimator from '@/components/VisionEstimator'
 import DxfImporter from '@/components/DxfImporter'
+import SkpImporter from '@/components/SkpImporter'
 import type { AhspOption } from '@/components/AhspCombobox'
 
 type ProjectOpt = { id: string; name: string }
-type Mode = 'foto' | 'dxf'
+type Mode = 'foto' | 'dxf' | 'skp'
 
 export default function EstimatorTabs({
   projectId,
@@ -38,13 +39,19 @@ export default function EstimatorTabs({
         >
           File CAD - DXF (Presisi)
         </button>
+        <button
+          onClick={() => setMode('skp')}
+          className={`px-3 py-2 text-sm font-medium ${
+            mode === 'skp' ? 'border-b-2 border-slate-900 text-slate-900' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Model SketchUp - SKP (Eksperimental)
+        </button>
       </div>
 
-      {mode === 'foto' ? (
-        <VisionEstimator projectId={projectId} projects={projects} ahspItems={ahspItems} />
-      ) : (
-        <DxfImporter projectId={projectId} projects={projects} ahspItems={ahspItems} />
-      )}
+      {mode === 'foto' && <VisionEstimator projectId={projectId} projects={projects} ahspItems={ahspItems} />}
+      {mode === 'dxf' && <DxfImporter projectId={projectId} projects={projects} ahspItems={ahspItems} />}
+      {mode === 'skp' && <SkpImporter projectId={projectId} projects={projects} ahspItems={ahspItems} />}
     </div>
   )
 }
