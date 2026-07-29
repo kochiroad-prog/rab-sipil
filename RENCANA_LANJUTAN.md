@@ -278,7 +278,7 @@ di proses ini.
 
 ## 12. FASE F — Upload Foto (Storage) & Sidebar Berkategori
 
-> Status: **RENCANA (belum dieksekusi)** — menunggu konfirmasi user.
+> Status: **SELESAI (F1-F5 dieksekusi)** — 29 Juli 2026.
 > Audit ulang read-only 29 Juli 2026 (setelah Fase A-E selesai).
 
 ### 12.1 Temuan
