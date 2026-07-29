@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { insertDraftItems } from '@/app/(dashboard)/projects/actions'
 import AhspCombobox, { type AhspOption } from '@/components/AhspCombobox'
+import { uploadToBucket } from '@/lib/upload-client'
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
@@ -50,22 +51,28 @@ type DraftItem = {
 
 type Stage = 'upload' | 'questions' | 'review'
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
+type ProjectOpt = { id: string; name: string }
 
-export default function VisionEstimator({ projectId, ahspItems }: { projectId: string; ahspItems: AhspOption[] }) {
+export default function VisionEstimator({
+  projectId,
+  projects,
+  ahspItems,
+}: {
+  projectId?: string
+  projects?: ProjectOpt[]
+  ahspItems: AhspOption[]
+}) {
   const [stage, setStage] = useState<Stage>('upload')
   const [images, setImages] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
   const [hints, setHints] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId ?? '__none__')
 
+  const activeProjectId = projectId ?? (selectedProjectId !== '__none__' ? selectedProjectId : null)
+
+  const [estimationId, setEstimationId] = useState<string | null>(null)
   const [detection, setDetection] = useState<DetectResult | null>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
 
@@ -79,9 +86,27 @@ export default function VisionEstimator({ projectId, ahspItems }: { projectId: s
   )
 
   async function handleFiles(files: FileList | null) {
-    if (!files) return
-    const urls = await Promise.all(Array.from(files).slice(0, 5).map(fileToDataUrl))
-    setImages(urls)
+    if (!files || files.length === 0) return
+    setUploading(true)
+    setError(null)
+    try {
+      const chosen = Array.from(files).slice(0, 5)
+      const urls: string[] = []
+      for (const file of chosen) {
+        try {
+          urls.push(await uploadToBucket('project-photos', file))
+        } catch (e) {
+          setError('Upload gagal: ' + (e instanceof Error ? e.message : 'tidak diketahui'))
+        }
+      }
+      setImages((prev) => [...prev, ...urls])
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function removeImage(u: string) {
+    setImages((prev) => prev.filter((x) => x !== u))
   }
 
   async function handleDetect() {
@@ -97,6 +122,29 @@ export default function VisionEstimator({ projectId, ahspItems }: { projectId: s
       if (!res.ok) throw new Error(data.error ?? 'Gagal menganalisa')
       setDetection(data)
       setStage('questions')
+
+      // Simpan riwayat analisa (foto + hasil deteksi) permanen — tidak lagi hilang setelah sesi.
+      try {
+        const saveRes = await fetch('/api/ai/estimations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project_id: activeProjectId,
+            image_urls: images,
+            job_name: data.job_name,
+            hints,
+            template_id: data.template_id,
+            template_name: data.template_name,
+            confidence: data.confidence,
+            notes: data.notes,
+            questions: data.questions,
+          }),
+        })
+        const saveData = await saveRes.json()
+        if (saveRes.ok) setEstimationId(saveData.id)
+      } catch {
+        // riwayat gagal disimpan — tidak menghentikan alur analisa utama
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
     } finally {
@@ -156,6 +204,10 @@ export default function VisionEstimator({ projectId, ahspItems }: { projectId: s
   }
 
   async function handleSave() {
+    if (!activeProjectId) {
+      setError('Pilih proyek dulu sebelum menyimpan ke Rincian RAB.')
+      return
+    }
     setLoading(true)
     setSaveMsg(null)
     const chosen = items
@@ -168,11 +220,18 @@ export default function VisionEstimator({ projectId, ahspItems }: { projectId: s
         unit_price: it.unit_price,
         tkdn_percent: it.tkdn_percent,
       }))
-    const { error } = await insertDraftItems(projectId, section || null, chosen)
+    const { error } = await insertDraftItems(activeProjectId, section || null, chosen)
     setLoading(false)
     if (error) {
       setError(error)
       return
+    }
+    if (estimationId) {
+      fetch('/api/ai/estimations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: estimationId, answers, status: 'saved', items_count: chosen.length, project_id: activeProjectId }),
+      }).catch(() => {})
     }
     setSaveMsg(`${chosen.length} item ditambahkan ke Rincian RAB.`)
     setStage('upload')
@@ -181,6 +240,7 @@ export default function VisionEstimator({ projectId, ahspItems }: { projectId: s
     setDetection(null)
     setAnswers({})
     setItems([])
+    setEstimationId(null)
   }
 
   return (
@@ -196,14 +256,51 @@ export default function VisionEstimator({ projectId, ahspItems }: { projectId: s
 
       {stage === 'upload' && (
         <div className="mt-4 space-y-3">
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => handleFiles(e.target.files)}
-            className="block text-sm"
-          />
-          {images.length > 0 && <p className="text-xs text-slate-500">{images.length} gambar dipilih.</p>}
+          {projects && projects.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600">Masukkan ke Proyek (opsional)</label>
+              <select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className="mt-1 w-full max-w-sm rounded-md border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="__none__">Belum dikaitkan</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => handleFiles(e.target.files)}
+              disabled={uploading}
+              className="block text-sm"
+            />
+            {uploading && <p className="mt-1 text-xs text-slate-400">Mengupload foto...</p>}
+            {images.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {images.map((u) => (
+                  <div key={u} className="group relative h-16 w-16 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={u} alt="foto lokasi" className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(u)}
+                      className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1 text-[10px] text-white opacity-0 group-hover:opacity-100"
+                    >
+                      x
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <textarea
             value={hints}
             onChange={(e) => setHints(e.target.value)}
@@ -213,7 +310,7 @@ export default function VisionEstimator({ projectId, ahspItems }: { projectId: s
           />
           <button
             onClick={handleDetect}
-            disabled={loading || (images.length === 0 && !hints.trim())}
+            disabled={loading || uploading || (images.length === 0 && !hints.trim())}
             className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
           >
             {loading ? 'Menganalisa...' : 'Analisa'}

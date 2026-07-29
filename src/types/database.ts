@@ -562,3 +562,25 @@ export type StructuralElement = {
   created_at: string
   updated_at: string
 }
+
+export type AiEstimationStatus = 'draft' | 'questions' | 'saved'
+
+export type AiEstimation = {
+  id: string
+  owner_id: string
+  project_id: string | null
+  image_urls: string[]
+  job_name: string | null
+  hints: string | null
+  template_id: string | null
+  template_name: string | null
+  confidence: string | null
+  notes: string | null
+  questions: unknown
+  answers: Record<string, string>
+  status: AiEstimationStatus
+  model: string | null
+  items_count: number | null
+  created_at: string
+  updated_at: string
+}

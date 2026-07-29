@@ -15,6 +15,7 @@ import {
   Banknote,
   BarChart3,
   MessageSquare,
+  Sparkles,
 } from 'lucide-react'
 
 export type NavItem = { href: string; label: string; icon: ElementType }
@@ -25,6 +26,7 @@ export const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/projects', label: 'Proyek', icon: Building2 },
+      { href: '/estimator', label: 'AI Estimator', icon: Sparkles },
     ],
   },
   {
