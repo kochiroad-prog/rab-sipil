@@ -273,3 +273,108 @@ Fase E (Notifikasi WhatsApp) — dikerjakan sekaligus, instance diisi user belak
 Tiap fase: migration → actions → UI → verifikasi (`tsc`/`eslint`/`next build`) → commit
 terpisah, mengikuti pola kerja sesi-sesi sebelumnya. Tidak ada kode/DB RAB Estima yang disentuh
 di proses ini.
+
+---
+
+## 12. FASE F — Upload Foto (Storage) & Sidebar Berkategori
+
+> Status: **RENCANA (belum dieksekusi)** — menunggu konfirmasi user.
+> Audit ulang read-only 29 Juli 2026 (setelah Fase A-E selesai).
+
+### 12.1 Temuan
+
+**A. Tidak ada Supabase Storage bucket sama sekali di project rab-sipil.**
+Dicek langsung (`select * from storage.buckets`) → kosong. RAB Estima punya 5 bucket publik:
+`furniture-images`, `material-images`, `payment-proofs`, `spk-signatures`, `labour-photos`,
+masing-masing dipakai lewat pola konsisten: `supabase.storage.from(bucket).upload()` →
+`getPublicUrl()` → URL-nya disimpan di kolom `*_url` tabel terkait.
+
+**B. Pola foto yang sudah ada di Estimator Sipil semua salah kaprah — base64 langsung ke DB,
+bukan file ke Storage:**
+- `SignaturePad` (tanda tangan peminjaman alat & SPK) → `signature_data_url` isinya data-URI
+  base64 utuh disimpan di kolom teks Postgres.
+- `PaymentForm` / `TerminPayForm` (bukti bayar PO & termin upah) → sama, base64 di kolom
+  `proof_url`.
+- Ini boros ukuran DB, lambat saat halaman me-load banyak baris, dan tidak bisa di-crop/preview
+  sebagai thumbnail dengan baik.
+
+**C. PO Invoice tidak ada tombol upload sama sekali** — kolom `invoice_url` cuma `<input
+placeholder="Tempel link file invoice (opsional)">`, user harus punya link sendiri di tempat
+lain.
+
+**D. AI Estimator (`VisionEstimator.tsx`) sebenarnya sudah ada `<input type="file">`, tapi:**
+- Foto dikonversi ke base64 lalu dikirim langsung ke API vision — **tidak pernah disimpan**,
+  hilang setelah sesi analisa selesai (tidak ke Storage, tidak ke tabel apa pun).
+- Tidak ada tabel riwayat semacam `ai_estimations` RAB Estima (yang menyimpan `image_urls`,
+  `job_name`, `questions`, `status`, `model`, dst per analisa) — jadi user tidak bisa membuka lagi
+  hasil analisa lama beserta foto aslinya.
+- Tidak ada menu **top-level** "AI Estimator" di sidebar — komponennya cuma nempel di halaman
+  detail proyek, beda dari RAB Estima yang punya menu sendiri di grup "Utama".
+
+**E. Material/Peralatan/Tenaga Kerja tidak punya kolom foto sama sekali** — dicek skema, tidak
+ada `image_url`/`photo_url`/`ktp_url`. RAB Estima punya: `materials.image_url`,
+`equipment.image_url`, `labours.photo_url` + `labours.ktp_url`, `supplies.image_url`.
+
+**F. `equipment_services.receipt_url`** kolomnya sudah ada di skema Estimator Sipil sejak Fase A
+tapi **tidak pernah dipakai di UI manapun** (dead column, belum ada tombol upload struk servis).
+
+**G. Sidebar Estimator Sipil masih flat-list (15 item, tanpa grup),** beda dari RAB Estima yang
+dikelompokkan 4 grup dengan heading kecil ("Utama", "Database", "Gudang", "Operasional") plus
+warna aksen khusus untuk Barang Masuk (hijau) / Barang Keluar (merah) di grup Gudang
+(`app-sidebar.tsx` + `nav-items.tsx`).
+
+### 12.2 Rencana Implementasi (diusulkan 5 sub-fase, berurutan)
+
+**F1 — Fondasi upload foto (dikerjakan lebih dulu, semua sub-fase lain bergantung ini):**
+- Bikin komponen reusable `PhotoUploadInput` (client) yang upload ke Supabase Storage lalu
+  mengisi hidden input dengan public URL — pola sama seperti RAB Estima, menggantikan pola
+  base64-ke-DB yang sekarang dipakai `SignaturePad`/`PaymentForm`/`TerminPayForm`.
+- Buat bucket publik baru di project rab-sipil: `project-photos` (AI Estimator & dokumentasi
+  progress proyek), `material-images`, `equipment-images`, `labour-photos`, `payment-proofs`,
+  `signatures`, `invoices`. Policy: publik baca, hanya user login yang bisa upload, path
+  diprefix `owner_id` biar rapi per-user.
+- Migrasi `SignaturePad`, `PaymentForm`, `TerminPayForm` dari base64-in-DB → upload-ke-Storage +
+  simpan URL saja (mengecilkan ukuran DB, mempercepat load halaman).
+
+**F2 — Sidebar dikategorikan (cepat dikerjakan, dampak UX langsung terasa):**
+- Refactor `Sidebar.tsx` jadi berbasis grup seperti RAB Estima: **Utama** (Dashboard, Proyek, AI
+  Estimator — baru jadi top-level), **Database** (AHSP, Material, Supplier, Tenaga Kerja,
+  Template, Resep Volume), **Operasional** (Peralatan, PO & Invoice, Upah Kerja, Pembayaran,
+  Laporan), **Pengaturan** (Profil Perusahaan, Notifikasi WA).
+- Heading grup uppercase kecil + spasi antar-grup, sama gaya visual RAB Estima.
+
+**F3 — AI Estimator: upload permanen + riwayat (paling terasa user, karena eksplisit diminta):**
+- Tabel baru `ai_estimations` (project_id, image_urls[], job_name, hints, questions, status,
+  model, dst — mengikuti pola RAB Estima).
+- `VisionEstimator` diubah: foto diupload dulu ke bucket `project-photos` (dapat public URL),
+  baru URL-nya (bukan base64) dikirim ke API vision & disimpan sebagai baris `ai_estimations`.
+- Menu top-level baru "AI Estimator" di sidebar + halaman riwayat (list analisa AI per/lintas
+  proyek, bisa dibuka lagi lihat foto asli + hasil deteksi).
+
+**F4 — Foto di Database referensi (Material/Peralatan/Tenaga Kerja):**
+- Migrasi tambah kolom: `materials.image_url`, `equipment.image_url`, `labours.photo_url` +
+  `labours.ktp_url`.
+- Tambah `PhotoUploadInput` di form masing-masing (bucket sesuai domain).
+
+**F5 — Bukti/dokumen resmi via upload sungguhan (bukan tempel link):**
+- PO: ganti input manual "tempel link invoice" jadi tombol upload (bucket `invoices`).
+- Servis alat: sambungkan `equipment_services.receipt_url` (sudah ada kolomnya, belum ada UI) ke
+  form catat servis dengan tombol upload struk.
+
+### 12.3 Urutan eksekusi
+
+```
+F1 (fondasi Storage + migrasi pola base64→upload)
+   ↓
+F2 (sidebar berkategori) — independen, bisa diselingi kapan saja
+   ↓
+F3 (AI Estimator: riwayat + upload permanen)
+   ↓
+F4 (foto Material/Peralatan/Tenaga Kerja)
+   ↓
+F5 (upload invoice PO + struk servis alat)
+```
+
+Sama seperti fase-fase sebelumnya: tiap sub-fase migration → actions → UI → verifikasi
+(`tsc`/`eslint`/`next build`) → commit terpisah. Audit ini murni read-only terhadap RAB Estima
+(kode & `select` schema saja) — tidak ada file/baris DB RAB Estima yang diubah.
