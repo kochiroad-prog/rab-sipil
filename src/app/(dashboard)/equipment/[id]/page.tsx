@@ -201,7 +201,17 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
                   <td className="px-4 py-3 text-slate-600">{s.service_type}</td>
                   <td className="px-4 py-3 text-slate-600">{s.vendor ?? '-'}</td>
                   <td className="px-4 py-3 text-right text-slate-600">{formatRupiah(s.cost)}</td>
-                  <td className="px-4 py-3 text-slate-500">{s.notes ?? '-'}</td>
+                  <td className="px-4 py-3 text-slate-500">
+                    {s.notes ?? '-'}
+                    {s.receipt_url && (
+                      <>
+                        {' '}
+                        <a href={s.receipt_url} target="_blank" rel="noreferrer" className="text-xs text-blue-700 hover:underline">
+                          Lihat struk
+                        </a>
+                      </>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <form action={deleteEquipmentService} className="inline">
                       <input type="hidden" name="id" value={s.id} />

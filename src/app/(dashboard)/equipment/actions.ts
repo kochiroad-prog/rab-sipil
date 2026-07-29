@@ -180,6 +180,7 @@ export async function addEquipmentService(formData: FormData) {
     cost: numOrNull(formData, 'cost') ?? 0,
     vendor: strOrNull(formData, 'vendor'),
     notes: strOrNull(formData, 'notes'),
+    receipt_url: strOrNull(formData, 'receipt_url'),
     next_service_date: nextServiceDate,
   })
 

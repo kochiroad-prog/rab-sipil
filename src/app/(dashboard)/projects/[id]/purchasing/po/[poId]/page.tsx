@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { CompanyProfile, Project, PurchaseOrder, PurchaseOrderItem } from '@/types/database'
 import PrintButton from '@/components/PrintButton'
+import PhotoUploadInput from '@/components/PhotoUploadInput'
 import { recordInvoice } from '@/app/(dashboard)/purchasing/actions'
 import { receivePurchaseOrderToWarehouse } from '../../../warehouse/actions'
 import { cancelPurchaseOrder } from '../../po-actions'
@@ -155,7 +156,17 @@ export default async function PurchaseOrderDetailPage({
         {po.invoice_number && (
           <div className="mt-6 border-t border-slate-200 pt-4 text-xs text-slate-600">
             <p className="font-medium text-slate-800">Invoice Supplier</p>
-            <p>No: {po.invoice_number} · Nominal: {formatRupiah(po.invoice_amount ?? 0)} · Tgl: {po.invoice_date}</p>
+            <p>
+              No: {po.invoice_number} · Nominal: {formatRupiah(po.invoice_amount ?? 0)} · Tgl: {po.invoice_date}
+              {po.invoice_url && (
+                <>
+                  {' · '}
+                  <a href={po.invoice_url} target="_blank" rel="noreferrer" className="text-blue-700 hover:underline">
+                    Lihat file
+                  </a>
+                </>
+              )}
+            </p>
           </div>
         )}
       </div>
@@ -169,7 +180,7 @@ export default async function PurchaseOrderDetailPage({
             <input name="invoice_number" placeholder="No. Invoice" className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2" />
             <input name="invoice_amount" type="number" step="1" placeholder="Nominal invoice" defaultValue={po.total_amount} className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-1" />
             <input name="invoice_date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-1" />
-            <input name="invoice_url" placeholder="Tempel link file invoice (opsional)" className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-3" />
+            <PhotoUploadInput name="invoice_url" bucket="invoices" accept="image/*,.pdf" label="File Invoice (opsional)" className="sm:col-span-3" />
             <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:col-span-1">
               Simpan Invoice
             </button>
