@@ -17,6 +17,59 @@ export type AhspMatch = AhspMatchCandidate & { score: number }
 
 const STOPWORDS = new Set(['dan', 'di', 'ke', 'dari', 'yang', 'untuk', 'per', 'dengan', 'atau'])
 
+// Kamus sinonim istilah teknis sipil/konstruksi Indonesia — variasi kata di kolom kiri dinormalisasi
+// ke bentuk baku di kolom kanan sebelum dicocokkan, supaya "Pengecatan Tembok" bisa nyambung ke
+// "Cat Dinding" walau kata mentahnya berbeda. Murni lookup table deterministik, bukan AI.
+export const SIPIL_SYNONYMS: Record<string, string> = {
+  tembok: 'dinding',
+  cor: 'beton',
+  mengecor: 'beton',
+  pengecoran: 'beton',
+  pengecatan: 'cat',
+  pengecetan: 'cat',
+  mengecat: 'cat',
+  plesteran: 'plester',
+  memplester: 'plester',
+  acian: 'aci',
+  pengacian: 'aci',
+  mengaci: 'aci',
+  penggalian: 'gali',
+  galian: 'gali',
+  menggali: 'gali',
+  urugan: 'urug',
+  timbunan: 'urug',
+  pengurugan: 'urug',
+  mengurug: 'urug',
+  pembesian: 'besi',
+  penulangan: 'besi',
+  tulangan: 'besi',
+  bekisting: 'cetakan',
+  perancah: 'cetakan',
+  pemasangan: 'pasang',
+  pasangan: 'pasang',
+  memasang: 'pasang',
+  fondasi: 'pondasi',
+  plafond: 'plafon',
+  langit2: 'plafon',
+  tegel: 'keramik',
+  ubin: 'keramik',
+  perpipaan: 'pipa',
+  kelistrikan: 'listrik',
+  elektrikal: 'listrik',
+  pembongkaran: 'bongkar',
+  membongkar: 'bongkar',
+  pembersihan: 'bersih',
+  membersihkan: 'bersih',
+  pengangkutan: 'angkut',
+  transportasi: 'angkut',
+  drainase: 'saluran',
+  got: 'saluran',
+  waterproofing: 'waterproof',
+  pengukuran: 'ukur',
+  bowplank: 'uitzet',
+  uitzet: 'uitzet',
+}
+
 function normalizeTokens(text: string): string[] {
   return text
     .toLowerCase()
@@ -24,6 +77,7 @@ function normalizeTokens(text: string): string[] {
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter((t) => t.length > 1 && !STOPWORDS.has(t))
+    .map((t) => SIPIL_SYNONYMS[t] ?? t)
 }
 
 /** Index IDF (inverse document frequency) dibangun sekali dari seluruh kandidat, dipakai lintas beberapa pencarian. */

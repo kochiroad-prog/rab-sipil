@@ -26,6 +26,15 @@ type DetectResult = {
   template_name: string | null
 }
 
+type MatchedVia = 'rule' | 'ai' | 'none' | 'manual'
+
+const MATCH_BADGE: Record<MatchedVia, { label: string; className: string; title: string }> = {
+  rule: { label: 'Rule', className: 'bg-emerald-50 text-emerald-700', title: 'Cocok otomatis (skor tinggi, deterministik)' },
+  ai: { label: 'AI', className: 'bg-purple-50 text-purple-700', title: 'Dipilih AI dari kandidat rule engine — cek ulang sebelum disimpan' },
+  manual: { label: 'Manual', className: 'bg-blue-50 text-blue-700', title: 'Dipilih manual' },
+  none: { label: 'Kosong', className: 'bg-slate-100 text-slate-500', title: 'Tidak ada saran — pilih manual atau isi harga sendiri' },
+}
+
 type DraftItem = {
   name: string
   unit: string
@@ -36,6 +45,7 @@ type DraftItem = {
   unit_price: number
   tkdn_percent: number
   match_score: number
+  matched_via: MatchedVia
 }
 
 type Stage = 'upload' | 'questions' | 'review'
@@ -121,6 +131,7 @@ export default function VisionEstimator({ projectId, ahspItems }: { projectId: s
           unit_price?: number
           tkdn_percent?: number
           match_score?: number
+          matched_via?: MatchedVia
         }) => ({
           name: it.name,
           unit: it.unit,
@@ -131,6 +142,7 @@ export default function VisionEstimator({ projectId, ahspItems }: { projectId: s
           unit_price: it.unit_price ?? 0,
           tkdn_percent: it.tkdn_percent ?? 0,
           match_score: it.match_score ?? 0,
+          matched_via: it.matched_via ?? 'none',
         })
       )
       setItems(draft)
@@ -276,8 +288,12 @@ export default function VisionEstimator({ projectId, ahspItems }: { projectId: s
             />
           </div>
           <p className="text-xs text-slate-400">
-            Harga satuan tersaran otomatis dari referensi AHSP yang paling cocok (badge hijau = yakin, kuning =
-            kurang yakin, abu-abu = tidak ada saran) — cek &amp; koreksi lewat kolom Referensi AHSP sebelum disimpan.
+            Harga satuan tersaran otomatis dari referensi AHSP yang paling cocok. Badge{' '}
+            <span className="rounded bg-emerald-50 px-1 py-0.5 text-emerald-700">Rule</span> = cocok otomatis skor
+            tinggi (deterministik), <span className="rounded bg-purple-50 px-1 py-0.5 text-purple-700">AI</span> =
+            dipilih AI dari kandidat rule engine (cek ulang!),{' '}
+            <span className="rounded bg-blue-50 px-1 py-0.5 text-blue-700">Manual</span> = kamu pilih sendiri,{' '}
+            <span className="rounded bg-slate-100 px-1 py-0.5 text-slate-500">Kosong</span> = belum ada saran.
           </p>
           <div className="overflow-x-auto rounded-md border border-slate-200">
             <table className="w-full text-sm">
@@ -339,19 +355,11 @@ export default function VisionEstimator({ projectId, ahspItems }: { projectId: s
                     <td className="px-3 py-2 align-top">
                       <div className="flex items-center gap-1.5 min-w-[220px]">
                         <span
-                          title={
-                            it.ahsp_item_id
-                              ? `Skor kecocokan ${(it.match_score * 100).toFixed(0)}%`
-                              : 'Tidak ada saran otomatis'
-                          }
-                          className={`h-2 w-2 shrink-0 rounded-full ${
-                            !it.ahsp_item_id
-                              ? 'bg-slate-300'
-                              : it.match_score >= 0.7
-                              ? 'bg-emerald-500'
-                              : 'bg-amber-400'
-                          }`}
-                        />
+                          title={MATCH_BADGE[it.matched_via].title}
+                          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${MATCH_BADGE[it.matched_via].className}`}
+                        >
+                          {MATCH_BADGE[it.matched_via].label}
+                        </span>
                         <AhspCombobox
                           items={ahspItems}
                           placeholder="Cari AHSP..."
@@ -368,6 +376,7 @@ export default function VisionEstimator({ projectId, ahspItems }: { projectId: s
                                       tkdn_percent: picked?.tkdn_percent ?? x.tkdn_percent,
                                       unit: picked?.unit ?? x.unit,
                                       match_score: picked ? 1 : 0,
+                                      matched_via: picked ? 'manual' : 'none',
                                     }
                                   : x
                               )

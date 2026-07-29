@@ -59,7 +59,7 @@ async function callVision(messages: { role: string; content: string | ChatConten
   return content
 }
 
-function parseJSON<T>(text: string): T {
+export function parseJSON<T>(text: string): T {
   let t = text.trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim()
   const start = t.indexOf('{')
   const startArr = t.indexOf('[')
