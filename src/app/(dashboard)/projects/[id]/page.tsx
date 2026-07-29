@@ -88,6 +88,12 @@ export default async function ProjectDetailPage({
           >
             Purchasing
           </Link>
+          <Link
+            href={`/projects/${project.id}/quotation`}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+          >
+            Surat Penawaran
+          </Link>
           <a
             href={`/api/projects/${project.id}/export`}
             className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"

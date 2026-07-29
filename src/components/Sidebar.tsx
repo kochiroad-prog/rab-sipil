@@ -13,6 +13,7 @@ import {
   Ruler,
   Truck,
   HardHat,
+  Settings,
   LogOut,
   Menu,
   X,
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { href: '/volume-recipes', label: 'Resep Volume', icon: Ruler },
   { href: '/templates', label: 'Template', icon: LayoutTemplate },
   { href: '/labours', label: 'Tenaga Kerja', icon: Users },
+  { href: '/settings/company', label: 'Profil Perusahaan', icon: Settings },
 ]
 
 function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate: () => void }) {

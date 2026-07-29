@@ -301,6 +301,35 @@ export type EquipmentLoan = {
   updated_at: string
 }
 
+export type CompanyProfile = {
+  owner_id: string
+  company_name: string | null
+  address: string | null
+  phone: string | null
+  email: string | null
+  updated_at: string
+}
+
+export type QuotationStatus = 'draft' | 'terkirim' | 'diterima' | 'ditolak'
+
+export type Quotation = {
+  id: string
+  owner_id: string
+  project_id: string
+  quote_number: string | null
+  quote_date: string
+  valid_until: string | null
+  client_name: string | null
+  client_address: string | null
+  client_contact: string | null
+  greeting: string | null
+  closing_notes: string | null
+  discount_percent: number
+  status: QuotationStatus
+  created_at: string
+  updated_at: string
+}
+
 export type ElementType = 'kolom' | 'balok' | 'sloof' | 'plat'
 
 export type StructuralElement = {
