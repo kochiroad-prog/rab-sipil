@@ -1,10 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { Upload, Loader2, Check, X } from 'lucide-react'
 import { insertDraftItems } from '@/app/(dashboard)/projects/actions'
 import AhspCombobox, { type AhspOption } from '@/components/AhspCombobox'
 import { uploadToBucket } from '@/lib/upload-client'
 import { pdfToImageBlobs, isPdfFile } from '@/lib/pdf-to-images'
+
+const MAX_IMAGES = 5
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
@@ -63,6 +66,7 @@ export default function VisionEstimator({
   projects?: ProjectOpt[]
   ahspItems: AhspOption[]
 }) {
+  const fileRef = useRef<HTMLInputElement>(null)
   const [stage, setStage] = useState<Stage>('upload')
   const [images, setImages] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
@@ -91,7 +95,8 @@ export default function VisionEstimator({
     setUploading(true)
     setError(null)
     try {
-      const chosen = Array.from(files).slice(0, 5)
+      const remaining = Math.max(0, MAX_IMAGES - images.length)
+      const chosen = Array.from(files).slice(0, remaining)
       const urls: string[] = []
       for (const file of chosen) {
         try {
@@ -115,6 +120,7 @@ export default function VisionEstimator({
       setImages((prev) => [...prev, ...urls])
     } finally {
       setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
     }
   }
 
@@ -286,16 +292,41 @@ export default function VisionEstimator({
           )}
 
           <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading || images.length >= MAX_IMAGES}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white transition-colors ${
+                  images.length >= MAX_IMAGES ? 'bg-emerald-600/60 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'
+                } disabled:opacity-70`}
+              >
+                {uploading ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : images.length >= MAX_IMAGES ? (
+                  <Check className="size-3.5" />
+                ) : (
+                  <Upload className="size-3.5" />
+                )}
+                {uploading
+                  ? 'Memproses...'
+                  : images.length >= MAX_IMAGES
+                    ? `Maks. ${MAX_IMAGES} file`
+                    : 'Pilih Foto / PDF'}
+              </button>
+              {images.length > 0 && (
+                <span className="text-xs text-slate-500">{images.length} dari {MAX_IMAGES} gambar</span>
+              )}
+            </div>
             <input
+              ref={fileRef}
               type="file"
               accept="image/*,application/pdf"
               multiple
               onChange={(e) => handleFiles(e.target.files)}
-              disabled={uploading}
-              className="block text-sm"
+              className="hidden"
             />
-            <p className="mt-1 text-[11px] text-slate-400">Bisa foto atau PDF gambar kerja (tiap halaman PDF otomatis jadi gambar).</p>
-            {uploading && <p className="mt-1 text-xs text-slate-400">Memproses &amp; mengupload...</p>}
+            <p className="mt-1 text-[11px] text-slate-400">Bisa foto atau PDF gambar kerja (tiap halaman PDF otomatis jadi gambar), maks {MAX_IMAGES} file.</p>
             {images.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {images.map((u) => (
@@ -305,9 +336,10 @@ export default function VisionEstimator({
                     <button
                       type="button"
                       onClick={() => removeImage(u)}
-                      className="absolute right-0.5 top-0.5 rounded bg-black/60 px-1 text-[10px] text-white opacity-0 group-hover:opacity-100"
+                      title="Hapus gambar ini"
+                      className="absolute right-0.5 top-0.5 rounded bg-black/60 p-0.5 text-white opacity-0 group-hover:opacity-100"
                     >
-                      x
+                      <X className="size-3" />
                     </button>
                   </div>
                 ))}

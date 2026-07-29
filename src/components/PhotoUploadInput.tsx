@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Upload, X, Loader2, FileText } from 'lucide-react'
+import { Upload, X, Loader2, FileText, Check } from 'lucide-react'
 import { uploadToBucket, isImageUrl, type UploadBucket } from '@/lib/upload-client'
 
 /**
@@ -31,6 +31,8 @@ export default function PhotoUploadInput({
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
 
+  const done = !multiple && urls.length > 0
+
   async function onFiles(files: FileList | null) {
     if (!files || files.length === 0) return
     setUploading(true)
@@ -51,8 +53,9 @@ export default function PhotoUploadInput({
     }
   }
 
-  function removeUrl(u: string) {
-    setUrls((prev) => prev.filter((x) => x !== u))
+  function reset() {
+    setUrls([])
+    setError('')
   }
 
   return (
@@ -62,11 +65,19 @@ export default function PhotoUploadInput({
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          disabled={uploading}
-          className="flex items-center gap-1.5 rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:border-slate-400 hover:text-slate-800 disabled:opacity-50"
+          disabled={uploading || done}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white transition-colors ${
+            done ? 'bg-emerald-600/60 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'
+          } disabled:opacity-70`}
         >
-          {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
-          {uploading ? 'Mengupload...' : 'Upload'}
+          {uploading ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : done ? (
+            <Check className="size-3.5" />
+          ) : (
+            <Upload className="size-3.5" />
+          )}
+          {uploading ? 'Mengupload...' : done ? 'Terupload' : multiple ? 'Tambah File' : 'Upload File'}
         </button>
         <input
           ref={fileRef}
@@ -76,8 +87,10 @@ export default function PhotoUploadInput({
           onChange={(e) => onFiles(e.target.files)}
           className="hidden"
         />
-        {urls.length > 0 && !multiple && (
-          <span className="text-xs text-emerald-700">1 file terupload</span>
+        {done && (
+          <button type="button" onClick={reset} className="text-xs text-slate-500 hover:underline">
+            Ganti file
+          </button>
         )}
       </div>
 
@@ -106,7 +119,7 @@ export default function PhotoUploadInput({
               )}
               <button
                 type="button"
-                onClick={() => removeUrl(u)}
+                onClick={() => setUrls((prev) => prev.filter((x) => x !== u))}
                 className="absolute right-0.5 top-0.5 rounded bg-black/60 p-0.5 text-white opacity-0 group-hover:opacity-100"
               >
                 <X className="size-3" />

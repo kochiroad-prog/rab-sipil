@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { Upload, Check } from 'lucide-react'
 import { insertDraftItems } from '@/app/(dashboard)/projects/actions'
 import AhspCombobox, { type AhspOption } from '@/components/AhspCombobox'
 import { computeDxfTakeoff, isDxfFile, type DxfLayerSummary, type DxfUnitInfo } from '@/lib/dxf-takeoff'
@@ -30,6 +31,7 @@ export default function DxfImporter({
   projects?: ProjectOpt[]
   ahspItems: AhspOption[]
 }) {
+  const fileRef = useRef<HTMLInputElement>(null)
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId ?? '__none__')
   const activeProjectId = projectId ?? (selectedProjectId !== '__none__' ? selectedProjectId : null)
 
@@ -103,6 +105,16 @@ export default function DxfImporter({
     setRows((prev) => prev.map((r) => (r.layer === layer ? { ...r, ...patch } : r)))
   }
 
+  function resetFile() {
+    setRawText('')
+    setFileName('')
+    setUnit(null)
+    setManualScale('')
+    setRows([])
+    setError(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
   async function handleSave() {
     if (!activeProjectId) {
       setError('Pilih proyek dulu sebelum menyimpan ke Rincian RAB.')
@@ -164,11 +176,30 @@ export default function DxfImporter({
           </div>
         )}
 
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={!!fileName}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white transition-colors ${
+              fileName ? 'bg-emerald-600/60 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'
+            } disabled:opacity-70`}
+          >
+            {fileName ? <Check className="size-3.5" /> : <Upload className="size-3.5" />}
+            {fileName ? 'File Terupload' : 'Pilih File DXF'}
+          </button>
+          {fileName && (
+            <button type="button" onClick={resetFile} className="text-xs text-slate-500 hover:underline">
+              Ganti file
+            </button>
+          )}
+        </div>
         <input
+          ref={fileRef}
           type="file"
           accept=".dxf"
           onChange={(e) => handleFile(e.target.files?.[0])}
-          className="block text-sm"
+          className="hidden"
         />
 
         {fileName && unit && (
