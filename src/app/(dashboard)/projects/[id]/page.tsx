@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Project, RabItem } from '@/types/database'
 import AiAssist from '@/components/AiAssist'
-import VisionEstimator from '@/components/VisionEstimator'
+import EstimatorTabs from '@/components/EstimatorTabs'
 import ProjectSettings from '@/components/ProjectSettings'
 import AddRabItemForm from '@/components/AddRabItemForm'
 import RabItemsTable from '@/components/RabItemsTable'
@@ -122,7 +122,7 @@ export default async function ProjectDetailPage({
         tahunAnggaran={project.tahun_anggaran}
       />
 
-      <VisionEstimator projectId={project.id} ahspItems={ahspItems} />
+      <EstimatorTabs projectId={project.id} ahspItems={ahspItems} />
 
       <AiAssist />
 

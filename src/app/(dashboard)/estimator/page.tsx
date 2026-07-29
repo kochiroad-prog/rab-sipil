@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import type { AhspOption } from '@/components/AhspCombobox'
 import type { AiEstimation } from '@/types/database'
-import VisionEstimator from '@/components/VisionEstimator'
+import EstimatorTabs from '@/components/EstimatorTabs'
 import { isImageUrl } from '@/lib/upload-client'
 
 export default async function EstimatorPage() {
@@ -55,7 +55,7 @@ export default async function EstimatorPage() {
         </p>
       </div>
 
-      <VisionEstimator projects={projects} ahspItems={ahspItems} />
+      <EstimatorTabs projects={projects} ahspItems={ahspItems} />
 
       <div>
         <h2 className="text-sm font-medium text-slate-700">Riwayat Analisa</h2>
