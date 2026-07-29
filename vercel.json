@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/wa-retry", "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/wa-digest", "schedule": "0 1 * * *" }
+  ]
+}

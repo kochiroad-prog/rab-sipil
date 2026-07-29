@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { notifyWa, rp } from '@/lib/wa-notify'
 
 function strOrNull(formData: FormData, key: string) {
   const v = String(formData.get(key) ?? '').trim()
@@ -14,17 +15,29 @@ export async function recordInvoice(formData: FormData) {
   const projectId = String(formData.get('project_id') ?? '')
   if (!id) return
 
-  await supabase
+  const invoiceNumber = strOrNull(formData, 'invoice_number')
+  const invoiceAmount = formData.get('invoice_amount') ? Number(formData.get('invoice_amount')) : null
+
+  const { data: po } = await supabase
     .from('purchase_orders')
     .update({
-      invoice_number: strOrNull(formData, 'invoice_number'),
-      invoice_amount: formData.get('invoice_amount') ? Number(formData.get('invoice_amount')) : null,
+      invoice_number: invoiceNumber,
+      invoice_amount: invoiceAmount,
       invoice_url: strOrNull(formData, 'invoice_url'),
       invoice_date: strOrNull(formData, 'invoice_date') ?? new Date().toISOString().slice(0, 10),
       status: 'invoiced',
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
+    .select('po_number, supplier_name')
+    .single()
+
+  if (po) {
+    await notifyWa(
+      'invoice_masuk',
+      `Invoice supplier masuk\nPO: ${po.po_number}\nSupplier: ${po.supplier_name ?? '-'}\nNo. Invoice: ${invoiceNumber ?? '-'}\nNominal: ${rp(invoiceAmount)}`
+    )
+  }
 
   revalidatePath('/purchasing/po')
   revalidatePath('/purchasing/pembayaran')
@@ -66,6 +79,11 @@ export async function payPurchaseOrders(formData: FormData) {
     .from('purchase_orders')
     .update({ status: 'paid', payment_id: payment.id, updated_at: new Date().toISOString() })
     .in('id', poIdsRaw)
+
+  await notifyWa(
+    'pembayaran_berhasil',
+    `Pembayaran material berhasil\nSupplier: ${supplierName ?? '-'}\nJumlah PO: ${poIdsRaw.length}\nTotal: ${rp(totalAmount)}`
+  )
 
   revalidatePath('/purchasing/po')
   revalidatePath('/purchasing/pembayaran')

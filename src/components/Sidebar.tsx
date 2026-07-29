@@ -18,6 +18,7 @@ import {
   Wallet,
   Banknote,
   BarChart3,
+  MessageSquare,
   LogOut,
   Menu,
   X,
@@ -38,6 +39,7 @@ const NAV_ITEMS = [
   { href: '/templates', label: 'Template', icon: LayoutTemplate },
   { href: '/labours', label: 'Tenaga Kerja', icon: Users },
   { href: '/settings/company', label: 'Profil Perusahaan', icon: Settings },
+  { href: '/settings/whatsapp', label: 'Notifikasi WA', icon: MessageSquare },
 ]
 
 function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate: () => void }) {

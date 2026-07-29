@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { SpkApproverRole } from '@/types/database'
+import { notifyWa, rp } from '@/lib/wa-notify'
 
 const DEFAULT_CLAUSES: { title: string; body: string }[] = [
   {
@@ -254,7 +255,20 @@ export async function agreeSpk(formData: FormData) {
   const supabase = await createClient()
   const id = String(formData.get('id') ?? '')
   const projectId = String(formData.get('project_id') ?? '')
-  await supabase.from('manpower_spk').update({ status: 'agreed', updated_at: new Date().toISOString() }).eq('id', id)
+  const { data: spk } = await supabase
+    .from('manpower_spk')
+    .update({ status: 'agreed', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('spk_number, worker_name, grand_total')
+    .single()
+
+  if (spk) {
+    await notifyWa(
+      'spk_disetujui',
+      `SPK disepakati\nNo: ${spk.spk_number}\nPemborong: ${spk.worker_name ?? '-'}\nNilai: ${rp(spk.grand_total)}`
+    )
+  }
+
   revalidatePath(`/projects/${projectId}/manpower/spk/${id}`)
   revalidatePath('/upah-kerja')
 }

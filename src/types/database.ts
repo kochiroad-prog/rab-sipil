@@ -505,6 +505,36 @@ export type LabourTermin = {
   created_at: string
 }
 
+export type WaSettings = {
+  owner_id: string
+  enabled: boolean
+  api_url: string | null
+  api_key: string | null
+  instance: string | null
+  api_version: 'auto' | 'v1' | 'v2'
+  target_number: string | null
+  updated_at: string
+}
+
+export type WaEventSetting = {
+  id: string
+  owner_id: string
+  event_key: string
+  enabled: boolean
+  target_number: string | null
+}
+
+export type WaLog = {
+  id: string
+  owner_id: string
+  event_key: string
+  target: string | null
+  message: string | null
+  status: 'sent' | 'failed'
+  response: string | null
+  created_at: string
+}
+
 export type ElementType = 'kolom' | 'balok' | 'sloof' | 'plat'
 
 export type StructuralElement = {
