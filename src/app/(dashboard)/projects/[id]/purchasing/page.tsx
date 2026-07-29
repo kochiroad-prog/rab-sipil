@@ -3,10 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Project, RabItem, AhspComponent, Material } from '@/types/database'
 import { aggregateMaterials } from '@/lib/takeoff-sipil'
-
-function formatRupiah(n: number) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
-}
+import PurchasingTable from '@/components/PurchasingTable'
 
 export default async function PurchasingPage({
   params,
@@ -49,20 +46,29 @@ export default async function PurchasingPage({
   const { data: materials } = await supabase.from('materials').select('*').returns<Material[]>()
 
   const rows = aggregateMaterials(rabItems ?? [], componentsByAhspItem, materials ?? [])
-  const total = rows.reduce((s, r) => s + r.subtotal, 0)
   const unmatchedCount = rows.filter((r) => !r.matched).length
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link href={`/projects/${id}`} className="text-sm text-slate-500 hover:underline">
-          &larr; Kembali ke {project.name}
-        </Link>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-900">Rekap Kebutuhan Beli (Purchasing)</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Diagregasi dari komposisi AHSP bahan × volume item RAB, dibulatkan ke satuan beli utuh (sak/lembar/batang/dll).
-          Item RAB tanpa referensi AHSP atau AHSP tanpa komposisi bahan tidak ikut terhitung di sini.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Link href={`/projects/${id}`} className="text-sm text-slate-500 hover:underline">
+            &larr; Kembali ke {project.name}
+          </Link>
+          <h1 className="mt-1 text-2xl font-semibold text-slate-900">Rekap Kebutuhan Beli (Purchasing)</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Diagregasi dari komposisi AHSP bahan × volume item RAB, dibulatkan ke satuan beli utuh (sak/lembar/batang/dll).
+            Item RAB tanpa referensi AHSP atau AHSP tanpa komposisi bahan tidak ikut terhitung di sini.
+          </p>
+        </div>
+        {rows.length > 0 && (
+          <a
+            href={`/api/projects/${id}/purchasing-export`}
+            className="shrink-0 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+          >
+            Export Excel
+          </a>
+        )}
       </div>
 
       {rows.length === 0 ? (
@@ -78,42 +84,7 @@ export default async function PurchasingPage({
               Cek kolom &quot;Kebutuhan&quot; (satuan asli AHSP) vs satuan di halaman <Link href="/materials" className="underline">Database Material</Link>, lalu samakan satuannya (mis. ubah satuan komponen di AHSP jadi sak, bukan kg).
             </p>
           )}
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-slate-500">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Material</th>
-                  <th className="px-4 py-3 font-medium">Kategori</th>
-                  <th className="px-4 py-3 text-right font-medium">Kebutuhan</th>
-                  <th className="px-4 py-3 text-right font-medium">Qty Beli</th>
-                  <th className="px-4 py-3 text-right font-medium">Harga Satuan</th>
-                  <th className="px-4 py-3 text-right font-medium">Subtotal</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {rows.map((r) => (
-                  <tr key={r.key}>
-                    <td className="px-4 py-3">
-                      <span className="text-slate-900">{r.materialName}</span>
-                      {!r.matched && <span className="ml-2 text-xs text-amber-600">belum cocok</span>}
-                      <p className="text-xs text-slate-400">{r.detail}</p>
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">{r.category ?? '-'}</td>
-                    <td className="px-4 py-3 text-right text-slate-600">{r.costQty} {r.costUnit}</td>
-                    <td className="px-4 py-3 text-right font-medium text-slate-900">{r.purchaseQty} {r.purchaseUnit}</td>
-                    <td className="px-4 py-3 text-right text-slate-600">{formatRupiah(r.unitPrice)}</td>
-                    <td className="px-4 py-3 text-right font-medium text-slate-900">{formatRupiah(r.subtotal)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="border-t border-slate-200 text-sm">
-                <tr>
-                  <td colSpan={5} className="px-4 py-3 text-right font-semibold text-slate-900">Total Estimasi Belanja Bahan</td>
-                  <td className="px-4 py-3 text-right text-base font-semibold text-slate-900">{formatRupiah(total)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <PurchasingTable rows={rows} />
         </>
       )}
     </div>

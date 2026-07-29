@@ -23,6 +23,11 @@ export default async function ManpowerPage({
     .limit(1)
     .maybeSingle<ManpowerPlan>()
 
+  const { count: rabItemCount } = await supabase
+    .from('rab_items')
+    .select('*', { count: 'exact', head: true })
+    .eq('project_id', id)
+
   return (
     <div className="space-y-6">
       <div>
@@ -32,7 +37,17 @@ export default async function ManpowerPage({
         <h1 className="mt-1 text-2xl font-semibold text-slate-900">Rencana Tenaga Kerja</h1>
       </div>
 
-      <ManpowerClient projectId={id} initial={lastPlan?.ai_result ?? null} />
+      {!rabItemCount ? (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
+          Belum ada item RAB di proyek ini. Tambahkan dulu rincian pekerjaan di{' '}
+          <Link href={`/projects/${id}`} className="text-blue-700 underline">
+            halaman proyek
+          </Link>{' '}
+          sebelum generate rencana tenaga kerja — AI menganalisa dari situ.
+        </div>
+      ) : (
+        <ManpowerClient projectId={id} initial={lastPlan?.ai_result ?? null} />
+      )}
     </div>
   )
 }

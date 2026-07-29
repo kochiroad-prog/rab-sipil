@@ -24,6 +24,15 @@ export default function ManpowerClient({ projectId, initial }: { projectId: stri
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deadline, setDeadline] = useState<number | null>(initial?.summary_days ?? null)
+  const [workItemQuery, setWorkItemQuery] = useState('')
+
+  const filteredWorkItems = useMemo(() => {
+    const q = workItemQuery.trim().toLowerCase()
+    if (!q) return result?.work_items ?? []
+    return (result?.work_items ?? []).filter((wi) =>
+      `${wi.rab_item_name} ${wi.activity} ${wi.skill}`.toLowerCase().includes(q)
+    )
+  }, [result, workItemQuery])
 
   const displayed = useMemo(() => {
     if (!result) return null
@@ -142,6 +151,15 @@ export default function ManpowerClient({ projectId, initial }: { projectId: stri
             <p className="mt-1 text-sm text-slate-500">{result?.borongan_comparison.reasoning}</p>
           </div>
 
+          <div>
+            <input
+              value={workItemQuery}
+              onChange={(e) => setWorkItemQuery(e.target.value)}
+              placeholder="Cari item RAB, aktivitas, atau skill..."
+              className="w-full max-w-xs rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+            />
+          </div>
+
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-left text-slate-500">
@@ -155,7 +173,14 @@ export default function ManpowerClient({ projectId, initial }: { projectId: stri
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {result?.work_items.map((wi, i) => (
+                {filteredWorkItems.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
+                      Tidak ada yang cocok.
+                    </td>
+                  </tr>
+                )}
+                {filteredWorkItems.map((wi, i) => (
                   <tr key={i}>
                     <td className="px-4 py-3 text-slate-900">{wi.rab_item_name}</td>
                     <td className="px-4 py-3 text-slate-600">{wi.activity}</td>
