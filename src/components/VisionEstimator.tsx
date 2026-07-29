@@ -1,7 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { insertDraftItems } from '@/app/(dashboard)/projects/actions'
+import AhspCombobox, { type AhspOption } from '@/components/AhspCombobox'
+
+function formatRupiah(n: number) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
+}
 
 type VisionQuestion = {
   key: string
@@ -21,7 +26,17 @@ type DetectResult = {
   template_name: string | null
 }
 
-type DraftItem = { name: string; unit: string; volume_estimate: number | null; note: string; include: boolean }
+type DraftItem = {
+  name: string
+  unit: string
+  volume_estimate: number | null
+  note: string
+  include: boolean
+  ahsp_item_id: string | null
+  unit_price: number
+  tkdn_percent: number
+  match_score: number
+}
 
 type Stage = 'upload' | 'questions' | 'review'
 
@@ -34,7 +49,7 @@ function fileToDataUrl(file: File): Promise<string> {
   })
 }
 
-export default function VisionEstimator({ projectId }: { projectId: string }) {
+export default function VisionEstimator({ projectId, ahspItems }: { projectId: string; ahspItems: AhspOption[] }) {
   const [stage, setStage] = useState<Stage>('upload')
   const [images, setImages] = useState<string[]>([])
   const [hints, setHints] = useState('')
@@ -47,6 +62,11 @@ export default function VisionEstimator({ projectId }: { projectId: string }) {
   const [items, setItems] = useState<DraftItem[]>([])
   const [section, setSection] = useState('')
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
+
+  const estimatedTotal = useMemo(
+    () => items.filter((it) => it.include).reduce((sum, it) => sum + (it.volume_estimate ?? 0) * it.unit_price, 0),
+    [items]
+  )
 
   async function handleFiles(files: FileList | null) {
     if (!files) return
@@ -92,9 +112,25 @@ export default function VisionEstimator({ projectId }: { projectId: string }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Gagal membuat draft')
       const draft: DraftItem[] = (data.items ?? []).map(
-        (it: { name: string; unit: string; volume_estimate: number | null; note: string }) => ({
-          ...it,
+        (it: {
+          name: string
+          unit: string
+          volume_estimate: number | null
+          note: string
+          ahsp_item_id?: string | null
+          unit_price?: number
+          tkdn_percent?: number
+          match_score?: number
+        }) => ({
+          name: it.name,
+          unit: it.unit,
+          volume_estimate: it.volume_estimate,
+          note: it.note,
           include: true,
+          ahsp_item_id: it.ahsp_item_id ?? null,
+          unit_price: it.unit_price ?? 0,
+          tkdn_percent: it.tkdn_percent ?? 0,
+          match_score: it.match_score ?? 0,
         })
       )
       setItems(draft)
@@ -112,7 +148,14 @@ export default function VisionEstimator({ projectId }: { projectId: string }) {
     setSaveMsg(null)
     const chosen = items
       .filter((it) => it.include)
-      .map((it) => ({ name: it.name, unit: it.unit, volume: it.volume_estimate ?? 0 }))
+      .map((it) => ({
+        name: it.name,
+        unit: it.unit,
+        volume: it.volume_estimate ?? 0,
+        ahsp_item_id: it.ahsp_item_id,
+        unit_price: it.unit_price,
+        tkdn_percent: it.tkdn_percent,
+      }))
     const { error } = await insertDraftItems(projectId, section || null, chosen)
     setLoading(false)
     if (error) {
@@ -232,21 +275,27 @@ export default function VisionEstimator({ projectId }: { projectId: string }) {
               className="mt-1 w-full max-w-sm rounded-md border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
-          <div className="overflow-hidden rounded-md border border-slate-200">
+          <p className="text-xs text-slate-400">
+            Harga satuan tersaran otomatis dari referensi AHSP yang paling cocok (badge hijau = yakin, kuning =
+            kurang yakin, abu-abu = tidak ada saran) — cek &amp; koreksi lewat kolom Referensi AHSP sebelum disimpan.
+          </p>
+          <div className="overflow-x-auto rounded-md border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-left text-slate-500">
                 <tr>
                   <th className="px-3 py-2"></th>
                   <th className="px-3 py-2 font-medium">Uraian</th>
                   <th className="px-3 py-2 font-medium">Satuan</th>
-                  <th className="px-3 py-2 font-medium">Estimasi Volume</th>
-                  <th className="px-3 py-2 font-medium">Catatan</th>
+                  <th className="px-3 py-2 font-medium">Volume</th>
+                  <th className="px-3 py-2 font-medium">Referensi AHSP</th>
+                  <th className="px-3 py-2 text-right font-medium">Harga Satuan</th>
+                  <th className="px-3 py-2 text-right font-medium">Jumlah</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {items.map((it, i) => (
                   <tr key={i}>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 align-top">
                       <input
                         type="checkbox"
                         checked={it.include}
@@ -255,25 +304,26 @@ export default function VisionEstimator({ projectId }: { projectId: string }) {
                         }
                       />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 align-top">
                       <input
                         value={it.name}
                         onChange={(e) =>
                           setItems((arr) => arr.map((x, xi) => (xi === i ? { ...x, name: e.target.value } : x)))
                         }
-                        className="w-full rounded border border-slate-200 px-2 py-1 text-sm"
+                        className="w-full min-w-[180px] rounded border border-slate-200 px-2 py-1 text-sm"
                       />
+                      {it.note && <p className="mt-1 text-xs text-slate-400">{it.note}</p>}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 align-top">
                       <input
                         value={it.unit}
                         onChange={(e) =>
                           setItems((arr) => arr.map((x, xi) => (xi === i ? { ...x, unit: e.target.value } : x)))
                         }
-                        className="w-20 rounded border border-slate-200 px-2 py-1 text-sm"
+                        className="w-16 rounded border border-slate-200 px-2 py-1 text-sm"
                       />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 align-top">
                       <input
                         type="number"
                         step="0.01"
@@ -283,13 +333,76 @@ export default function VisionEstimator({ projectId }: { projectId: string }) {
                             arr.map((x, xi) => (xi === i ? { ...x, volume_estimate: Number(e.target.value) } : x))
                           )
                         }
-                        className="w-24 rounded border border-slate-200 px-2 py-1 text-sm"
+                        className="w-20 rounded border border-slate-200 px-2 py-1 text-sm"
                       />
                     </td>
-                    <td className="px-3 py-2 text-xs text-slate-500">{it.note}</td>
+                    <td className="px-3 py-2 align-top">
+                      <div className="flex items-center gap-1.5 min-w-[220px]">
+                        <span
+                          title={
+                            it.ahsp_item_id
+                              ? `Skor kecocokan ${(it.match_score * 100).toFixed(0)}%`
+                              : 'Tidak ada saran otomatis'
+                          }
+                          className={`h-2 w-2 shrink-0 rounded-full ${
+                            !it.ahsp_item_id
+                              ? 'bg-slate-300'
+                              : it.match_score >= 0.7
+                              ? 'bg-emerald-500'
+                              : 'bg-amber-400'
+                          }`}
+                        />
+                        <AhspCombobox
+                          items={ahspItems}
+                          placeholder="Cari AHSP..."
+                          className="flex-1"
+                          defaultSelected={ahspItems.find((a) => a.id === it.ahsp_item_id) ?? null}
+                          onSelect={(picked) =>
+                            setItems((arr) =>
+                              arr.map((x, xi) =>
+                                xi === i
+                                  ? {
+                                      ...x,
+                                      ahsp_item_id: picked?.id ?? null,
+                                      unit_price: picked?.unit_price ?? x.unit_price,
+                                      tkdn_percent: picked?.tkdn_percent ?? x.tkdn_percent,
+                                      unit: picked?.unit ?? x.unit,
+                                      match_score: picked ? 1 : 0,
+                                    }
+                                  : x
+                              )
+                            )
+                          }
+                        />
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        type="number"
+                        step="1"
+                        value={it.unit_price}
+                        onChange={(e) =>
+                          setItems((arr) =>
+                            arr.map((x, xi) => (xi === i ? { ...x, unit_price: Number(e.target.value) } : x))
+                          )
+                        }
+                        className="w-28 rounded border border-slate-200 px-2 py-1 text-right text-sm"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-right align-top font-medium text-slate-900">
+                      {formatRupiah((it.volume_estimate ?? 0) * it.unit_price)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="border-t border-slate-200">
+                <tr>
+                  <td colSpan={6} className="px-3 py-2 text-right text-slate-500">Estimasi Total</td>
+                  <td className="px-3 py-2 text-right font-semibold text-slate-900">
+                    {formatRupiah(estimatedTotal)}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
           <div className="flex gap-2">

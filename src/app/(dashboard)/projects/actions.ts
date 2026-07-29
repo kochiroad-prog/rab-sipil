@@ -112,7 +112,14 @@ export async function deleteRabItem(formData: FormData) {
   revalidatePath(`/projects/${project_id}`)
 }
 
-export type DraftItemInput = { name: string; unit: string; volume: number }
+export type DraftItemInput = {
+  name: string
+  unit: string
+  volume: number
+  ahsp_item_id?: string | null
+  unit_price?: number
+  tkdn_percent?: number
+}
 
 /** Insert batch draft item hasil AI Estimator (setelah diverifikasi user) sebagai rab_items baru. */
 export async function insertDraftItems(projectId: string, section: string | null, items: DraftItemInput[]) {
@@ -127,7 +134,9 @@ export async function insertDraftItems(projectId: string, section: string | null
       name: it.name,
       unit: it.unit,
       volume: it.volume || 0,
-      unit_price: 0,
+      ahsp_item_id: it.ahsp_item_id ?? null,
+      unit_price: it.unit_price ?? 0,
+      tkdn_percent: it.tkdn_percent ?? 0,
     }))
 
   if (rows.length === 0) return { error: null }

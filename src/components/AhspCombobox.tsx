@@ -24,16 +24,18 @@ export default function AhspCombobox({
   placeholder = 'Cari kode atau nama pekerjaan AHSP...',
   onSelect,
   className,
+  defaultSelected = null,
 }: {
   items: AhspOption[]
   name?: string
   placeholder?: string
   onSelect?: (item: AhspOption | null) => void
   className?: string
+  defaultSelected?: AhspOption | null
 }) {
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(defaultSelected?.name ?? '')
   const [open, setOpen] = useState(false)
-  const [selected, setSelected] = useState<AhspOption | null>(null)
+  const [selected, setSelected] = useState<AhspOption | null>(defaultSelected)
   const wrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {

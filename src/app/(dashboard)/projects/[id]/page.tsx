@@ -119,7 +119,7 @@ export default async function ProjectDetailPage({
         tahunAnggaran={project.tahun_anggaran}
       />
 
-      <VisionEstimator projectId={project.id} />
+      <VisionEstimator projectId={project.id} ahspItems={ahspItems} />
 
       <AiAssist />
 
