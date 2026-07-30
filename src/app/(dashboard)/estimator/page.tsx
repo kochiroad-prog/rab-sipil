@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { AhspOption } from '@/components/AhspCombobox'
 import type { AiEstimation } from '@/types/database'
 import EstimatorTabs from '@/components/EstimatorTabs'
-import { isImageUrl } from '@/lib/upload-client'
+import { isImageUrl } from '@/lib/url-utils'
 
 export default async function EstimatorPage() {
   const supabase = await createClient()

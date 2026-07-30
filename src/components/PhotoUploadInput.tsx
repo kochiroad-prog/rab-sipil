@@ -2,7 +2,8 @@
 
 import { useRef, useState } from 'react'
 import { Upload, X, Loader2, FileText, Check } from 'lucide-react'
-import { uploadToBucket, isImageUrl, type UploadBucket } from '@/lib/upload-client'
+import { uploadToBucket, type UploadBucket } from '@/lib/upload-client'
+import { isImageUrl } from '@/lib/url-utils'
 
 /**
  * Input upload foto/dokumen reusable — upload ke Supabase Storage lalu simpan public URL

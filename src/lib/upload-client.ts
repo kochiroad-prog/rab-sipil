@@ -24,6 +24,5 @@ export async function uploadToBucket(bucket: UploadBucket, file: File | Blob, ex
   return data.publicUrl
 }
 
-export function isImageUrl(url: string): boolean {
-  return /\.(png|jpe?g|gif|webp|svg)$/i.test(url.split('?')[0])
-}
+// isImageUrl dipindah ke '@/lib/url-utils' (tanpa 'use client') supaya bisa dipanggil langsung
+// dari Server Component (mis. halaman /estimator riwayat) tanpa kena error RSC boundary.

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { AiEstimation } from '@/types/database'
-import { isImageUrl } from '@/lib/upload-client'
+import { isImageUrl } from '@/lib/url-utils'
 
 type VisionQuestion = { key: string; label: string; unit?: string }
 
