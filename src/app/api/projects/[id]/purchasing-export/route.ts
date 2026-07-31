@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { buildPurchasingWorkbook } from '@/lib/export-purchasing'
 import { aggregateMaterials } from '@/lib/takeoff-sipil'
 import type { Project, RabItem, AhspComponent, Material } from '@/types/database'
+import { fetchAllRows } from '@/lib/supabase-paginate'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -43,9 +44,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
   }
 
-  const { data: materials } = await supabase.from('materials').select('*').returns<Material[]>()
+  const materials = await fetchAllRows<Material>((from, to) =>
+    supabase.from('materials').select('*').range(from, to).returns<Material[]>(),
+  )
 
-  const rows = aggregateMaterials(rabItems ?? [], componentsByAhspItem, materials ?? [])
+  const rows = aggregateMaterials(rabItems ?? [], componentsByAhspItem, materials)
 
   const wb = buildPurchasingWorkbook(project, rows)
   const buffer = await wb.xlsx.writeBuffer()

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { Material, Supplier } from '@/types/database'
 import MaterialForm from '@/components/MaterialForm'
 import MaterialsBrowser from '@/components/MaterialsBrowser'
+import { fetchAllRows } from '@/lib/supabase-paginate'
 
 const CATEGORY_LABEL: Record<string, string> = {
   semen: 'Semen',
@@ -48,10 +49,12 @@ export default async function MaterialsPage({
     data: { user },
   } = await supabase.auth.getUser()
 
-  let query = supabase.from('materials').select('*, suppliers(name)').order('name')
-  if (category) query = query.eq('category', category)
-  const { data: materialsRaw } = await query.returns<(Material & { suppliers: { name: string } | null })[]>()
-  const materials = materialsRaw ?? []
+  type MaterialRow = Material & { suppliers: { name: string } | null }
+  const materials = await fetchAllRows<MaterialRow>((from, to) => {
+    let query = supabase.from('materials').select('*, suppliers(name)').order('name').range(from, to)
+    if (category) query = query.eq('category', category)
+    return query.returns<MaterialRow[]>()
+  })
 
   const { data: suppliers } = await supabase.from('suppliers').select('*').order('name').returns<Supplier[]>()
 

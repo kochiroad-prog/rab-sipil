@@ -5,6 +5,7 @@ import type { Project, RabItem, AhspComponent, Material, PurchaseOrder } from '@
 import { aggregateMaterials } from '@/lib/takeoff-sipil'
 import PurchasingTable from '@/components/PurchasingTable'
 import BuatPOPanel from '@/components/BuatPOPanel'
+import { fetchAllRows } from '@/lib/supabase-paginate'
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
@@ -62,11 +63,14 @@ export default async function PurchasingPage({
     }
   }
 
-  const { data: materialsRaw } = await supabase
-    .from('materials')
-    .select('*, suppliers(id, name)')
-    .returns<(Material & { suppliers: { id: string; name: string } | null })[]>()
-  const materials = materialsRaw ?? []
+  type MaterialWithSupplier = Material & { suppliers: { id: string; name: string } | null }
+  const materials = await fetchAllRows<MaterialWithSupplier>((from, to) =>
+    supabase
+      .from('materials')
+      .select('*, suppliers(id, name)')
+      .range(from, to)
+      .returns<MaterialWithSupplier[]>(),
+  )
 
   const supplierByMaterialId: Record<string, { id: string | null; name: string }> = {}
   for (const m of materials) {

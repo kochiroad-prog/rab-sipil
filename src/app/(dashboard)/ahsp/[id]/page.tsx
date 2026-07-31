@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { AhspItem, AhspComponent, Material } from '@/types/database'
+import { fetchAllRows } from '@/lib/supabase-paginate'
 import { addAhspComponent, deleteAhspComponent, syncAhspPriceFromComponents } from '../actions'
 
 function formatRupiah(n: number) {
@@ -29,11 +30,9 @@ export default async function AhspItemDetailPage({
     .order('created_at')
     .returns<AhspComponent[]>()
 
-  const { data: materials } = await supabase
-    .from('materials')
-    .select('*')
-    .order('name')
-    .returns<Material[]>()
+  const materials = await fetchAllRows<Material>((from, to) =>
+    supabase.from('materials').select('*').order('name').range(from, to).returns<Material[]>(),
+  )
 
   const list = components ?? []
   const groups: Record<string, AhspComponent[]> = { material: [], labor: [], equipment: [] }

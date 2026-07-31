@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Material, Project, ProjectWarehouse } from '@/types/database'
+import { fetchAllRows } from '@/lib/supabase-paginate'
 import {
   updateWarehouseSettings,
   recordStockIn,
@@ -77,8 +78,9 @@ export default async function ProjectWarehousePage({ params }: { params: Promise
     .returns<TxRow[]>()
   const transactions = txRaw ?? []
 
-  const { data: materialsRaw } = await supabase.from('materials').select('*').order('name').returns<Material[]>()
-  const materials = materialsRaw ?? []
+  const materials = await fetchAllRows<Material>((from, to) =>
+    supabase.from('materials').select('*').order('name').range(from, to).returns<Material[]>(),
+  )
 
   const totalStockValue = stock.reduce((s, r) => s + r.qty * r.avg_cost, 0)
 
