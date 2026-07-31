@@ -54,8 +54,11 @@ export type RabItem = {
 }
 
 export type MaterialCategory =
-  | 'semen' | 'pasir' | 'kerikil' | 'besi' | 'kayu' | 'bata' | 'keramik'
-  | 'cat' | 'pipa' | 'kabel' | 'cat_finishing' | 'lainnya'
+  | 'semen' | 'pasir' | 'kerikil' | 'besi' | 'baja' | 'kayu' | 'bata' | 'beton' | 'keramik'
+  | 'cat' | 'pipa' | 'kabel' | 'elektrikal' | 'mep_utilitas' | 'sanitair' | 'atap'
+  | 'rangka_atap' | 'talang' | 'insulasi' | 'waterproofing' | 'plafon' | 'pintu_jendela'
+  | 'kaca_aluminium' | 'ornamen' | 'lansekap' | 'jalan' | 'tanah' | 'geotekstil'
+  | 'alat_bantu' | 'lainnya'
 export type MaterialKind = 'linear' | 'sheet' | 'coverage' | 'count' | 'bulk'
 
 export type Material = {
