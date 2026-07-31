@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { FormulaType, VolumeRecipe, VolumeRecipeItem } from '@/types/database'
 import type { AhspOption } from '@/components/AhspCombobox'
 import RecipeItemForm from '@/components/RecipeItemForm'
+import { fetchAllRows } from '@/lib/supabase-paginate'
 import { addVolumeRecipe, deleteVolumeRecipe, deleteVolumeRecipeItem } from './actions'
 
 const FORMULA_OPTIONS: { value: FormulaType; label: string }[] = [
@@ -38,15 +39,17 @@ export default async function VolumeRecipesPage() {
 
   const recipes = recipesRaw ?? []
 
-  const { data: ahspItemsRaw } = await supabase
-    .from('ahsp_items')
-    .select('id, code, name, unit, unit_price, tkdn_percent, ahsp_categories(name)')
-    .order('name', { ascending: true })
-    .returns<
-      { id: string; code: string | null; name: string; unit: string; unit_price: number; tkdn_percent: number; ahsp_categories: { name: string } | null }[]
-    >()
+  type AhspItemRaw = { id: string; code: string | null; name: string; unit: string; unit_price: number; tkdn_percent: number; ahsp_categories: { name: string } | null }
+  const ahspItemsRaw = await fetchAllRows<AhspItemRaw>((from, to) =>
+    supabase
+      .from('ahsp_items')
+      .select('id, code, name, unit, unit_price, tkdn_percent, ahsp_categories(name)')
+      .order('name', { ascending: true })
+      .range(from, to)
+      .returns<AhspItemRaw[]>(),
+  )
 
-  const ahspItems: AhspOption[] = (ahspItemsRaw ?? []).map((a) => ({
+  const ahspItems: AhspOption[] = ahspItemsRaw.map((a) => ({
     id: a.id,
     code: a.code,
     name: a.name,

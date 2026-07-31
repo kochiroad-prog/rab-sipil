@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { generateDraftItems } from '@/lib/openrouter-vision'
 import { buildAhspMatchIndex, findBestAhspMatch, findTopAhspMatches, type AhspMatchCandidate } from '@/lib/ahsp-match'
 import { arbitrateAhspMatches, type ArbiterItem } from '@/lib/ahsp-arbiter'
+import { fetchAllRows } from '@/lib/supabase-paginate'
 
 const CONFIDENT_THRESHOLD = 0.6
 
@@ -31,14 +32,16 @@ export async function POST(req: NextRequest) {
 
     // Cocokkan tiap item draft ke referensi AHSP (deterministik, bukan AI) supaya harga satuan
     // langsung tersaran alih-alih 0 — user tetap bisa ganti/koreksi di tabel review.
-    const { data: ahspRaw } = await supabase
-      .from('ahsp_items')
-      .select('id, code, name, unit, unit_price, tkdn_percent, ahsp_categories(name)')
-      .returns<
-        { id: string; code: string | null; name: string; unit: string; unit_price: number; tkdn_percent: number; ahsp_categories: { name: string } | null }[]
-      >()
+    type AhspItemRaw = { id: string; code: string | null; name: string; unit: string; unit_price: number; tkdn_percent: number; ahsp_categories: { name: string } | null }
+    const ahspRaw = await fetchAllRows<AhspItemRaw>((from, to) =>
+      supabase
+        .from('ahsp_items')
+        .select('id, code, name, unit, unit_price, tkdn_percent, ahsp_categories(name)')
+        .range(from, to)
+        .returns<AhspItemRaw[]>(),
+    )
 
-    const candidates: AhspMatchCandidate[] = (ahspRaw ?? []).map((a) => ({
+    const candidates: AhspMatchCandidate[] = ahspRaw.map((a) => ({
       id: a.id,
       code: a.code,
       name: a.name,

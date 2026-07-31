@@ -4,6 +4,7 @@ import type { AhspOption } from '@/components/AhspCombobox'
 import type { AiEstimation } from '@/types/database'
 import EstimatorTabs from '@/components/EstimatorTabs'
 import { isImageUrl } from '@/lib/url-utils'
+import { fetchAllRows } from '@/lib/supabase-paginate'
 
 export default async function EstimatorPage() {
   const supabase = await createClient()
@@ -14,14 +15,16 @@ export default async function EstimatorPage() {
     .order('created_at', { ascending: false })
   const projects = projectsRaw ?? []
 
-  const { data: ahspItemsRaw } = await supabase
-    .from('ahsp_items')
-    .select('id, code, name, unit, unit_price, tkdn_percent, ahsp_categories(name)')
-    .order('name', { ascending: true })
-    .returns<
-      { id: string; code: string | null; name: string; unit: string; unit_price: number; tkdn_percent: number; ahsp_categories: { name: string } | null }[]
-    >()
-  const ahspItems: AhspOption[] = (ahspItemsRaw ?? []).map((a) => ({
+  type AhspItemRaw = { id: string; code: string | null; name: string; unit: string; unit_price: number; tkdn_percent: number; ahsp_categories: { name: string } | null }
+  const ahspItemsRaw = await fetchAllRows<AhspItemRaw>((from, to) =>
+    supabase
+      .from('ahsp_items')
+      .select('id, code, name, unit, unit_price, tkdn_percent, ahsp_categories(name)')
+      .order('name', { ascending: true })
+      .range(from, to)
+      .returns<AhspItemRaw[]>(),
+  )
+  const ahspItems: AhspOption[] = ahspItemsRaw.map((a) => ({
     id: a.id,
     code: a.code,
     name: a.name,

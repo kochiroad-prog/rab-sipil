@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import type { AhspItem, AhspCategory } from '@/types/database'
 import AhspBrowser from '@/components/AhspBrowser'
+import { fetchAllRows } from '@/lib/supabase-paginate'
 import { addAhspItem } from './actions'
 
 const BIDANG_LABEL: Record<string, string> = {
@@ -28,14 +29,16 @@ export default async function AhspPage({
     .order('sort_order')
     .returns<AhspCategory[]>()
 
-  const query = supabase
-    .from('ahsp_items')
-    .select('*, ahsp_categories(code, name, bidang)')
-    .order('name')
+  type ItemWithCategory = AhspItem & { ahsp_categories: (AhspCategory & { bidang: string | null }) | null }
 
-  const { data: allItems } = await query.returns<
-    (AhspItem & { ahsp_categories: (AhspCategory & { bidang: string | null }) | null })[]
-  >()
+  const allItems = await fetchAllRows<ItemWithCategory>((from, to) =>
+    supabase
+      .from('ahsp_items')
+      .select('*, ahsp_categories(code, name, bidang)')
+      .order('name')
+      .range(from, to)
+      .returns<ItemWithCategory[]>(),
+  )
 
   const items = bidang
     ? (allItems ?? []).filter((it) => it.ahsp_categories?.bidang === bidang)

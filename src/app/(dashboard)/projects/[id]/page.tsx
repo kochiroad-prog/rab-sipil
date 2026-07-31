@@ -8,6 +8,7 @@ import ProjectSettings from '@/components/ProjectSettings'
 import AddRabItemForm from '@/components/AddRabItemForm'
 import RabItemsTable from '@/components/RabItemsTable'
 import type { AhspOption } from '@/components/AhspCombobox'
+import { fetchAllRows } from '@/lib/supabase-paginate'
 import { deleteProject } from '../actions'
 
 export default async function ProjectDetailPage({
@@ -34,15 +35,17 @@ export default async function ProjectDetailPage({
     .order('created_at', { ascending: true })
     .returns<RabItem[]>()
 
-  const { data: ahspItemsRaw } = await supabase
-    .from('ahsp_items')
-    .select('id, code, name, unit, unit_price, tkdn_percent, ahsp_categories(name)')
-    .order('name', { ascending: true })
-    .returns<
-      { id: string; code: string | null; name: string; unit: string; unit_price: number; tkdn_percent: number; ahsp_categories: { name: string } | null }[]
-    >()
+  type AhspItemRaw = { id: string; code: string | null; name: string; unit: string; unit_price: number; tkdn_percent: number; ahsp_categories: { name: string } | null }
+  const ahspItemsRaw = await fetchAllRows<AhspItemRaw>((from, to) =>
+    supabase
+      .from('ahsp_items')
+      .select('id, code, name, unit, unit_price, tkdn_percent, ahsp_categories(name)')
+      .order('name', { ascending: true })
+      .range(from, to)
+      .returns<AhspItemRaw[]>(),
+  )
 
-  const ahspItems: AhspOption[] = (ahspItemsRaw ?? []).map((a) => ({
+  const ahspItems: AhspOption[] = ahspItemsRaw.map((a) => ({
     id: a.id,
     code: a.code,
     name: a.name,
