@@ -4,13 +4,20 @@ import { useMemo, useRef, useState } from 'react'
 import { Upload, Check } from 'lucide-react'
 import { insertDraftItems } from '@/app/(dashboard)/projects/actions'
 import AhspCombobox, { type AhspOption } from '@/components/AhspCombobox'
-import { computeSkpTakeoff, isSkpFile, type SkpMaterialSummary, type SkpTakeoffResult } from '@/lib/skp-takeoff'
+import {
+  computeSkpTakeoff,
+  isSkpFile,
+  parseSkpPluginJson,
+  isSkpPluginJsonFile,
+  type SkpMaterialSummary,
+  type SkpTakeoffResult,
+} from '@/lib/skp-takeoff'
 
 function formatRupiah(n: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
 }
 
-type GroupMode = 'material' | 'group'
+type GroupMode = 'material' | 'tag' | 'group'
 
 type Row = SkpMaterialSummary & {
   include: boolean
@@ -37,17 +44,26 @@ export default function SkpImporter({
 
   const [fileName, setFileName] = useState('')
   const [materialRows, setMaterialRows] = useState<Row[]>([])
+  const [tagRows, setTagRows] = useState<Row[]>([])
   const [groupRows, setGroupRows] = useState<Row[]>([])
   const [groupMode, setGroupMode] = useState<GroupMode>('material')
-  const [meta, setMeta] = useState<Omit<SkpTakeoffResult, 'byMaterial' | 'byGroup'> | null>(null)
+  const [meta, setMeta] = useState<Omit<SkpTakeoffResult, 'byMaterial' | 'byGroup' | 'byTag' | 'definitionCount'> | null>(
+    null
+  )
   const [section, setSection] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [parsing, setParsing] = useState(false)
 
-  const rows = groupMode === 'material' ? materialRows : groupRows
-  const setRows = groupMode === 'material' ? setMaterialRows : setGroupRows
+  const rowsByMode: Record<GroupMode, Row[]> = { material: materialRows, tag: tagRows, group: groupRows }
+  const setRowsByMode: Record<GroupMode, (updater: (prev: Row[]) => Row[]) => void> = {
+    material: setMaterialRows,
+    tag: setTagRows,
+    group: setGroupRows,
+  }
+  const rows = rowsByMode[groupMode]
+  const setRows = setRowsByMode[groupMode]
 
   const estimatedTotal = useMemo(
     () =>
@@ -70,23 +86,24 @@ export default function SkpImporter({
 
   async function handleFile(file: File | undefined) {
     if (!file) return
-    if (!isSkpFile(file)) {
-      setError('File harus berformat .skp (file model SketchUp).')
+    const isSkp = isSkpFile(file)
+    const isJson = isSkpPluginJsonFile(file)
+    if (!isSkp && !isJson) {
+      setError('File harus berformat .skp (model SketchUp) atau .json (hasil export plugin Estima RAB Export).')
       return
     }
     setSaveMsg(null)
     setError(null)
     setFileName(file.name)
-    setSection(file.name.replace(/\.skp$/i, ''))
+    setSection(file.name.replace(/\.(skp|json)$/i, ''))
     setParsing(true)
     try {
-      const buffer = await file.arrayBuffer()
-      const result = computeSkpTakeoff(buffer)
+      const result = isSkp ? computeSkpTakeoff(await file.arrayBuffer()) : parseSkpPluginJson(await file.text())
       setMaterialRows(toRows(result.byMaterial))
+      setTagRows(toRows(result.byTag))
       setGroupRows(toRows(result.byGroup))
       setGroupMode('material')
       setMeta({
-        definitionCount: result.definitionCount,
         meshCount: result.meshCount,
         materialCount: result.materialCount,
         sketchupVersion: result.sketchupVersion,
@@ -95,8 +112,9 @@ export default function SkpImporter({
         setError('Tidak ada permukaan yang terbaca dari file ini.')
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Gagal membaca file SketchUp')
+      setError(e instanceof Error ? e.message : 'Gagal membaca file')
       setMaterialRows([])
+      setTagRows([])
       setGroupRows([])
       setMeta(null)
     } finally {
@@ -111,6 +129,7 @@ export default function SkpImporter({
   function resetFile() {
     setFileName('')
     setMaterialRows([])
+    setTagRows([])
     setGroupRows([])
     setMeta(null)
     setError(null)
@@ -132,8 +151,9 @@ export default function SkpImporter({
         unit_price: r.unit_price,
         tkdn_percent: r.tkdn_percent,
       }))
+    const modeLabel = { material: 'material', tag: 'tag', group: 'grup' }[groupMode]
     if (chosen.length === 0) {
-      setError(`Tidak ada ${groupMode === 'material' ? 'material' : 'grup'} yang dicentang untuk disimpan.`)
+      setError(`Tidak ada ${modeLabel} yang dicentang untuk disimpan.`)
       return
     }
     setLoading(true)
@@ -146,17 +166,19 @@ export default function SkpImporter({
     setSaveMsg(`${chosen.length} item (dari model SketchUp) ditambahkan ke Rincian RAB.`)
     setFileName('')
     setMaterialRows([])
+    setTagRows([])
     setGroupRows([])
     setMeta(null)
   }
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5">
-      <h3 className="font-medium text-slate-900">Import Model SketchUp (.skp) — Eksperimental</h3>
+      <h3 className="font-medium text-slate-900">Import Model SketchUp — Eksperimental</h3>
       <p className="mt-1 text-sm text-slate-500">
-        Luas dihitung langsung dari geometri 3D di file .skp, dikelompokkan per nama material (atap, lantai, keramik,
-        dst) — karena nama grup/komponen di model 3D biasanya generik. Fitur ini masih baru, cek ulang angkanya
-        sebelum dipakai final.
+        Upload file .skp langsung (dibaca otomatis di browser), atau file .json hasil export plugin{' '}
+        <span className="font-medium">Estima RAB Export</span> dari dalam SketchUp (menu Plugins → &quot;Estima RAB:
+        Export Seleksi ke JSON&quot; — lebih akurat karena baca lewat API resmi SketchUp). Luas dikelompokkan per nama
+        material, tag, atau grup/komponen. Fitur ini masih baru, cek ulang angkanya sebelum dipakai final.
       </p>
 
       {error && <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -189,7 +211,7 @@ export default function SkpImporter({
             } disabled:opacity-70`}
           >
             {fileName ? <Check className="size-3.5" /> : <Upload className="size-3.5" />}
-            {parsing ? 'Membaca file...' : fileName ? 'File Terupload' : 'Pilih File SKP'}
+            {parsing ? 'Membaca file...' : fileName ? 'File Terupload' : 'Pilih File SKP / JSON'}
           </button>
           {fileName && !parsing && (
             <button type="button" onClick={resetFile} className="text-xs text-slate-500 hover:underline">
@@ -200,20 +222,20 @@ export default function SkpImporter({
         <input
           ref={fileRef}
           type="file"
-          accept=".skp"
+          accept=".skp,.json"
           onChange={(e) => handleFile(e.target.files?.[0])}
           className="hidden"
         />
 
         {meta && (
           <p className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
-            {fileName} · SketchUp versi {meta.sketchupVersion} · {meta.meshCount} permukaan dari {meta.definitionCount}{' '}
-            grup/komponen · {meta.materialCount} material terbaca. Satuan sudah otomatis dalam meter.
+            {fileName} · SketchUp versi {meta.sketchupVersion} · {meta.meshCount} permukaan · {meta.materialCount}{' '}
+            material terbaca. Satuan sudah otomatis dalam meter.
           </p>
         )}
       </div>
 
-      {(materialRows.length > 0 || groupRows.length > 0) && (
+      {(materialRows.length > 0 || tagRows.length > 0 || groupRows.length > 0) && (
         <div className="mt-4 space-y-3">
           <div className="flex flex-wrap items-end gap-4">
             <div>
@@ -236,6 +258,13 @@ export default function SkpImporter({
                 </button>
                 <button
                   type="button"
+                  onClick={() => setGroupMode('tag')}
+                  className={`border-l border-slate-300 px-3 py-1.5 ${groupMode === 'tag' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                >
+                  Tag/Layer ({tagRows.length})
+                </button>
+                <button
+                  type="button"
                   onClick={() => setGroupMode('group')}
                   className={`border-l border-slate-300 px-3 py-1.5 ${groupMode === 'group' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
                 >
@@ -250,7 +279,9 @@ export default function SkpImporter({
               <thead className="bg-slate-50 text-left text-slate-500">
                 <tr>
                   <th className="px-3 py-2"></th>
-                  <th className="px-3 py-2 font-medium">{groupMode === 'material' ? 'Material' : 'Grup/Komponen'}</th>
+                  <th className="px-3 py-2 font-medium">
+                    {{ material: 'Material', tag: 'Tag/Layer', group: 'Grup/Komponen' }[groupMode]}
+                  </th>
                   <th className="px-3 py-2 text-right font-medium">Luas (m2)</th>
                   <th className="px-3 py-2 font-medium">Referensi AHSP</th>
                   <th className="px-3 py-2 text-right font-medium">Harga Satuan</th>

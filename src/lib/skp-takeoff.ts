@@ -39,6 +39,7 @@ export type SkpMaterialSummary = {
 export type SkpTakeoffResult = {
   byMaterial: SkpMaterialSummary[]
   byGroup: SkpMaterialSummary[]
+  byTag: SkpMaterialSummary[]
   definitionCount: number
   meshCount: number
   materialCount: number
@@ -87,6 +88,7 @@ export function computeSkpTakeoff(buffer: ArrayBuffer): SkpTakeoffResult {
 
   const byMaterial = new Map<string, SkpMaterialSummary>()
   const byGroup = new Map<string, SkpMaterialSummary>()
+  const byTag = new Map<string, SkpMaterialSummary>()
 
   function ensure(map: Map<string, SkpMaterialSummary>, key: string): SkpMaterialSummary {
     let s = map.get(key)
@@ -105,7 +107,9 @@ export function computeSkpTakeoff(buffer: ArrayBuffer): SkpTakeoffResult {
       const key = colorKey(bc[0] * 255, bc[1] * 255, bc[2] * 255)
       materialName = colorToName.get(key) ?? materialName
     }
-    const groupName = model.meshIndex?.[prim.geomName]?.definitionName || 'modelspace'
+    const meshMeta = model.meshIndex?.[prim.geomName]
+    const groupName = meshMeta?.definitionName || 'modelspace'
+    const tagName = meshMeta?.layer && meshMeta.layer !== 'Layer0' ? meshMeta.layer : 'Tanpa tag'
 
     let area = 0
     let faces = 0
@@ -121,11 +125,16 @@ export function computeSkpTakeoff(buffer: ArrayBuffer): SkpTakeoffResult {
     const sg = ensure(byGroup, groupName)
     sg.totalAreaM2 += area
     sg.faceCount += faces
+
+    const st = ensure(byTag, tagName)
+    st.totalAreaM2 += area
+    st.faceCount += faces
   }
 
   return {
     byMaterial: Array.from(byMaterial.values()).sort((a, b) => b.totalAreaM2 - a.totalAreaM2),
     byGroup: Array.from(byGroup.values()).sort((a, b) => b.totalAreaM2 - a.totalAreaM2),
+    byTag: Array.from(byTag.values()).sort((a, b) => b.totalAreaM2 - a.totalAreaM2),
     definitionCount: model.definitions?.size ?? 0,
     meshCount: prims.length,
     materialCount: model.materials?.length ?? 0,
@@ -135,4 +144,77 @@ export function computeSkpTakeoff(buffer: ArrayBuffer): SkpTakeoffResult {
 
 export function isSkpFile(file: File): boolean {
   return file.name.toLowerCase().endsWith('.skp')
+}
+
+// ---------------------------------------------------------------------------
+// Import dari plugin SketchUp (Estima RAB Export, Tahap 1) — file JSON yang
+// sudah berisi hasil agregasi (byMaterial/byTag/byGroup) dihitung langsung di
+// dalam SketchUp lewat Ruby API resmi (Face#area), jadi di sini kita cuma
+// validasi bentuknya lalu pakai apa adanya (tidak perlu hitung ulang).
+// ---------------------------------------------------------------------------
+
+const PLUGIN_JSON_SCHEMA = 'estima-skp-plugin/v1'
+
+export type SkpPluginResult = SkpTakeoffResult & {
+  modelName: string
+  generatedAt: string
+}
+
+function readSummaryArray(value: unknown, label: string): SkpMaterialSummary[] {
+  if (!Array.isArray(value)) throw new Error(`Struktur JSON tidak valid: "${label}" harus berupa array.`)
+  return value.map((item, i) => {
+    if (
+      typeof item !== 'object' ||
+      item === null ||
+      typeof (item as Record<string, unknown>).material !== 'string' ||
+      typeof (item as Record<string, unknown>).totalAreaM2 !== 'number'
+    ) {
+      throw new Error(`Struktur JSON tidak valid pada "${label}[${i}]".`)
+    }
+    const rec = item as { material: string; totalAreaM2: number; faceCount?: number }
+    return { material: rec.material, totalAreaM2: rec.totalAreaM2, faceCount: rec.faceCount ?? 0 }
+  })
+}
+
+export function parseSkpPluginJson(jsonText: string): SkpPluginResult {
+  let raw: unknown
+  try {
+    raw = JSON.parse(jsonText)
+  } catch (e) {
+    throw new Error('File bukan JSON yang valid: ' + (e instanceof Error ? e.message : 'gagal parse'))
+  }
+  if (typeof raw !== 'object' || raw === null) {
+    throw new Error('Struktur JSON tidak valid (bukan objek).')
+  }
+  const obj = raw as Record<string, unknown>
+  if (obj.schema !== PLUGIN_JSON_SCHEMA) {
+    throw new Error(
+      `File ini bukan hasil export dari plugin Estima RAB Export (schema tidak cocok, dapat "${String(
+        obj.schema
+      )}", diharapkan "${PLUGIN_JSON_SCHEMA}"). Pastikan file berasal dari menu "Estima RAB: Export Seleksi ke JSON" di SketchUp.`
+    )
+  }
+
+  const byMaterial = readSummaryArray(obj.byMaterial, 'byMaterial')
+  const byTag = readSummaryArray(obj.byTag, 'byTag')
+  const byGroup = readSummaryArray(obj.byGroup, 'byGroup')
+  if (byMaterial.length === 0) {
+    throw new Error('File export ini kosong (tidak ada permukaan yang ter-export).')
+  }
+
+  return {
+    byMaterial,
+    byTag,
+    byGroup,
+    definitionCount: 0,
+    meshCount: typeof obj.selection_face_count === 'number' ? obj.selection_face_count : byMaterial.reduce((s, m) => s + m.faceCount, 0),
+    materialCount: byMaterial.length,
+    sketchupVersion: typeof obj.sketchup_version === 'string' ? obj.sketchup_version : 'tidak diketahui',
+    modelName: typeof obj.model_name === 'string' ? obj.model_name : 'Tanpa nama',
+    generatedAt: typeof obj.generated_at === 'string' ? obj.generated_at : '',
+  }
+}
+
+export function isSkpPluginJsonFile(file: File): boolean {
+  return file.name.toLowerCase().endsWith('.json')
 }
