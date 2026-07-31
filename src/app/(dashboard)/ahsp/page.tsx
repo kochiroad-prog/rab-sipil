@@ -30,7 +30,7 @@ export default async function AhspPage({
 
   const query = supabase
     .from('ahsp_items')
-    .select('*, ahsp_categories(name, bidang)')
+    .select('*, ahsp_categories(code, name, bidang)')
     .order('name')
 
   const { data: allItems } = await query.returns<
@@ -76,7 +76,7 @@ export default async function AhspPage({
           <select name="category_id" className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2" defaultValue="">
             <option value="">-- Kategori --</option>
             {(categories ?? []).map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id}>{c.code ? `${c.code} — ${c.name}` : c.name}</option>
             ))}
           </select>
           <input name="name" required placeholder="Nama pekerjaan" className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-1" />

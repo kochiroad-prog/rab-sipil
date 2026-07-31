@@ -22,11 +22,13 @@ export default function AhspBrowser({
   const [categoryId, setCategoryId] = useState('')
 
   const categoryOptions = useMemo(() => {
-    const map = new Map<string, string>()
+    const map = new Map<string, { code: string | null; name: string }>()
     for (const it of items) {
-      if (it.category_id && it.ahsp_categories?.name) map.set(it.category_id, it.ahsp_categories.name)
+      if (it.category_id && it.ahsp_categories?.name) {
+        map.set(it.category_id, { code: it.ahsp_categories.code, name: it.ahsp_categories.name })
+      }
     }
-    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
+    return Array.from(map.entries()).sort((a, b) => a[1].name.localeCompare(b[1].name))
   }, [items])
 
   const filtered = useMemo(() => {
@@ -58,9 +60,9 @@ export default function AhspBrowser({
           className="rounded-md border border-slate-300 px-3 py-2 text-sm"
         >
           <option value="">-- Semua Kategori --</option>
-          {categoryOptions.map(([id, catName]) => (
+          {categoryOptions.map(([id, cat]) => (
             <option key={id} value={id}>
-              {catName}
+              {cat.code ? `${cat.code} — ${cat.name}` : cat.name}
             </option>
           ))}
         </select>
@@ -91,7 +93,13 @@ export default function AhspBrowser({
             {filtered.slice(0, 300).map((it) => (
               <tr key={it.id}>
                 <td className="px-4 py-3 text-slate-500">{it.code ?? '-'}</td>
-                <td className="px-4 py-3 text-slate-600">{it.ahsp_categories?.name ?? '-'}</td>
+                <td className="px-4 py-3 text-slate-600">
+                  {it.ahsp_categories
+                    ? it.ahsp_categories.code
+                      ? `${it.ahsp_categories.code} — ${it.ahsp_categories.name}`
+                      : it.ahsp_categories.name
+                    : '-'}
+                </td>
                 <td className="px-4 py-3">
                   <Link href={`/ahsp/${it.id}`} className="text-slate-900 underline">
                     {it.name}
